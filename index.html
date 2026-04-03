@@ -18,6 +18,8 @@
 
     <!-- PapaParse for CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- SheetJS for XLSX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
         /* --- Google Material 3 Variables --- */
@@ -339,7 +341,7 @@
                 <span class="label">Upload Daily Price</span>
                 <span class="daily-status" id="daily-status-home">No recent updates</span>
             </button>
-            <input type="file" id="daily-upload-input" accept=".csv" class="hidden" onchange="handleDailyUpload(event)">
+            <input type="file" id="daily-upload-input" accept=".xlsx" class="hidden" onchange="handleDailyUpload(event)">
         </main>
     </div>
 
@@ -427,6 +429,9 @@
         <div class="dialog-container">
             <div class="dialog-header">
                 <h2>Select Items to Print</h2>
+            </div>
+            <div style="padding: 12px 24px; border-bottom: 1px solid var(--md-sys-color-surface-container-high);">
+                <input type="text" id="dialog-search" placeholder="Search items..." class="md-text-field" style="width:100%; height:40px;" oninput="filterDialogItems(this.value)">
             </div>
             <div style="padding: 12px 24px; background: var(--md-sys-color-surface-container); display: flex; align-items: center; gap: 16px; border-bottom: 1px solid var(--md-sys-color-surface-container-high);">
                 <input type="checkbox" id="check-all" checked onchange="toggleSelectAll()">
@@ -671,7 +676,7 @@
             });
         };
 
-        // Daily File Upload
+        // Daily File Upload (XLSX)
         window.handleDailyUpload = (e) => {
             const file = e.target.files[0];
             if(!file) return;
@@ -682,13 +687,16 @@
                 return;
             }
 
-            Papa.parse(file, {
-                header: false,
-                skipEmptyLines: true,
-                complete: function(results) {
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                try {
+                    const wb = XLSX.read(ev.target.result, { type: 'array' });
+                    const ws = wb.Sheets[wb.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
                     let headerIndex = -1;
-                    for(let i=0; i<results.data.length; i++) {
-                        if(results.data[i][0] && results.data[i][0].toString().trim() === 'PLU No') {
+                    for(let i = 0; i < rows.length; i++) {
+                        if(rows[i][0] && rows[i][0].toString().trim() === 'PLU No') {
                             headerIndex = i; break;
                         }
                     }
@@ -702,14 +710,14 @@
                     let changedCount = 0;
                     let checkedCount = 0;
 
-                    for(let i = headerIndex + 1; i < results.data.length; i++) {
-                        const row = results.data[i];
+                    for(let i = headerIndex + 1; i < rows.length; i++) {
+                        const row = rows[i];
                         const plu = row[0] ? row[0].toString().trim() : null;
                         const price = row[3] ? parseFloat(row[3].toString().replace(/,/g, '')) : NaN;
 
                         if(plu && !isNaN(price) && appData[plu]) {
                             checkedCount++;
-                            if (appData[plu].currentPrice !== price) {
+                            if(appData[plu].currentPrice !== price) {
                                 appData[plu].currentPrice = price;
                                 changedCount++;
                             }
@@ -730,8 +738,12 @@
                     } else {
                         showToast(`Checked ${checkedCount} items. No price changes found.`, "done_all");
                     }
+                } catch(err) {
+                    showToast("Failed to read XLSX file. Please check the format.", "error");
+                    e.target.value = '';
                 }
-            });
+            };
+            reader.readAsArrayBuffer(file);
         };
 
         // Table Rendering & Editing
@@ -829,7 +841,18 @@
             document.getElementById('generate-dialog').classList.remove('hidden');
         };
 
-        const closeGenerateDialog = () => { document.getElementById('generate-dialog').classList.add('hidden'); };
+        const closeGenerateDialog = () => { 
+            document.getElementById('generate-dialog').classList.add('hidden');
+            document.getElementById('dialog-search').value = '';
+        };
+
+        const filterDialogItems = (query) => {
+            const q = query.toLowerCase();
+            document.querySelectorAll('#dialog-list-body .list-item').forEach(el => {
+                const title = el.querySelector('.list-item-title').innerText.toLowerCase();
+                el.style.display = title.includes(q) ? '' : 'none';
+            });
+        };
 
         const toggleSelectAll = () => {
             const checked = document.getElementById('check-all').checked;
