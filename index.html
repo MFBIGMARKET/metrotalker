@@ -220,7 +220,7 @@
         .list-item-subtitle { font-size: 14px; color: var(--md-sys-color-on-surface-variant); }
         input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--md-sys-color-primary); cursor: pointer; }
 
-        /* --- Print Specific Styling (1 Col, 9 Rows) --- */
+        /* --- Print Specific Styling --- */
         @media screen { #print-area { display: none !important; } }
         
         @media print {
@@ -228,24 +228,89 @@
             body * { display: none !important; }
             #print-area, #print-area * { display: flex !important; visibility: visible; }
             #print-area { display: block !important; position: absolute; top: 0; left: 0; width: 100%; background: white; }
+            
             .print-page {
                 display: flex !important; flex-direction: column !important; width: 210mm; height: 297mm;
                 page-break-after: always; box-sizing: border-box; padding: 0; margin: 0;
             }
+            
+            /* Print Row Grid - Exact 8 divisions of page */
             .talker-label {
-                display: flex !important; flex-direction: row !important; justify-content: space-between !important;
-                align-items: center !important; height: 33mm; width: 100%; padding: 0 12mm !important;
-                box-sizing: border-box; border-bottom: 1px dashed #9aa0a6;
+                display: flex !important; flex-direction: row !important;
+                justify-content: flex-start !important; align-items: center !important;
+                height: calc(100% / 8) !important;
+                width: 100%; padding: 0 5mm 0 5mm !important;
+                box-sizing: border-box;
+                border-bottom: 2px dashed #aaa !important;
             }
-            .talker-label:nth-child(9n) { border-bottom: none; }
+
+            .talker-label:last-child {
+                border-bottom: none !important;
+            }
+
+            /* LEFT COLUMN: fixed 55% so price always starts at same spot */
             .talker-name {
-                color: var(--red-print) !important; font-size: 26pt; font-weight: 900; text-align: left; text-transform: uppercase;
-                font-family: 'Roboto', sans-serif; max-width: 65%; line-height: 1.1; display: -webkit-box !important;
-                -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+                display: block !important;
+                width: 65% !important;
+                flex-shrink: 0 !important;
+                flex-grow: 0 !important;
+                padding-right: 4mm !important;
+                box-sizing: border-box !important;
+                color: var(--red-print) !important;
+                font-size: 88px !important;
+                font-weight: 900 !important;
+                -webkit-text-stroke: 1px var(--red-print) !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-align: left !important;
+                text-transform: uppercase !important;
+                font-family: 'Calibri', sans-serif !important;
+                line-height: 1 !important;
             }
-            .talker-price-container { display: flex !important; align-items: baseline !important; gap: 2mm; }
-            .talker-price { color: #000 !important; font-size: 34pt; font-weight: 900; font-family: 'Roboto', sans-serif; }
-            .talker-unit { color: #000 !important; font-size: 20pt; font-weight: 700; font-family: 'Roboto', sans-serif; }
+
+            /* RIGHT COLUMN: left-aligned from the 55% mark, consistent across all rows */
+            .talker-price-container {
+                flex-shrink: 0 !important;
+                flex-grow: 0 !important;
+                display: flex !important;
+                flex-direction: row !important;
+                justify-content: flex-start !important;
+                align-items: baseline !important;
+                white-space: nowrap !important;
+            }
+            /* Big price number — inline-block so sup stays within it */
+            .talker-price {
+                color: #000 !important;
+                font-size: 92px !important;
+                font-weight: 900 !important;
+                font-family: 'Calibri', sans-serif !important;
+                line-height: 1 !important;
+                display: inline-block !important;
+                white-space: nowrap !important;
+                vertical-align: baseline !important;
+            }
+            /* Decimal: top of number, not top of line */
+            .talker-decimal {
+                font-size: 28px !important;
+                font-weight: 700 !important;
+                font-family: 'Calibri', sans-serif !important;
+                color: #000 !important;
+                vertical-align: top !important;
+                position: relative !important;
+                top: 14px !important;
+                line-height: 1 !important;
+            }
+            .talker-unit {
+                color: #000 !important;
+                font-size: 44px !important;
+                font-weight: 700 !important;
+                font-family: 'Calibri', sans-serif !important;
+                line-height: 1 !important;
+                white-space: nowrap !important;
+                display: inline-block !important;
+                vertical-align: baseline !important;
+                margin-bottom: 4px !important;
+            }
         }
     </style>
 </head>
@@ -420,6 +485,13 @@
             if(savedData) {
                 try {
                     appData = JSON.parse(savedData);
+                    // Migrate fraction symbols back to plain unit labels
+                    let migrated = false;
+                    Object.values(appData).forEach(item => {
+                        if(item.unitText === '½KG') { item.unitText = '500G'; migrated = true; }
+                        else if(item.unitText === '¼KG') { item.unitText = '250G'; migrated = true; }
+                    });
+                    if(migrated) saveData();
                     updateMasterStatus();
                     renderTable();
                 } catch(e) { console.error("Could not parse local data"); }
@@ -449,6 +521,18 @@
             const num = parseFloat(val);
             if(isNaN(num)) return val;
             return '₹' + Number.parseFloat(num.toFixed(2)).toString();
+        };
+
+        // Returns HTML: whole number with decimal as native superscript
+        const formatPriceHTML = (val) => {
+            const num = parseFloat(val);
+            if(isNaN(num)) return `₹${Math.round(num)}`;
+            const fixed = num.toFixed(2);
+            const [whole, dec] = fixed.split('.');
+            if(dec && dec !== '00') {
+                return `₹${whole}<sup class="talker-decimal">.${dec}</sup>`;
+            }
+            return `₹${whole}`;
         };
 
         const cleanItemName = (rawName) => {
@@ -689,11 +773,11 @@
                 const numVal = parseFloat(val) || 1;
                 appData[plu].conversion = numVal;
 
-                if (numVal === 0.5) appData[plu].unitText = '500G';
-                else if (numVal === 0.25) appData[plu].unitText = '250G';
-                else if (numVal === 0.1) appData[plu].unitText = '100G';
-                else if (numVal === 0.2) appData[plu].unitText = '200G';
-                else {
+                if (numVal > 0 && numVal < 1) {
+                    // Any decimal < 1 → grams, e.g. 0.7 → 700G
+                    const grams = Math.round(numVal * 1000);
+                    appData[plu].unitText = `${grams}G`;
+                } else {
                     let baseUnit = 'KG';
                     const upName = appData[plu].rawName.toUpperCase();
                     if(upName.includes('BOX')) baseUnit = 'BOX';
@@ -763,27 +847,50 @@
 
             const printArea = document.getElementById('print-area'); printArea.innerHTML = ''; 
 
-            for (let i = 0; i < selectedPLUs.length; i += 9) {
-                const chunk = selectedPLUs.slice(i, i + 9);
+            // Modified to exact 8-items per page
+            for (let i = 0; i < selectedPLUs.length; i += 8) {
+                const chunk = selectedPLUs.slice(i, i + 8);
                 const pageWrap = document.createElement('div'); pageWrap.className = 'print-page';
 
                 chunk.forEach(plu => {
                     const item = appData[plu];
                     const calcPrice = item.currentPrice * item.conversion;
-                    const formattedPrice = formatPrice(calcPrice);
+                    const formattedPriceHTML = formatPriceHTML(calcPrice);
                     
                     const labelDiv = document.createElement('div'); labelDiv.className = 'talker-label';
+
+                    // Name column always 65%
+                    const nameWidth = '65%';
+                    const maxPx = 566;
+
+                    // Word-fit: add words one by one until they'd overflow the name column
+                    const fitName = (() => {
+                        const words = item.displayName.toUpperCase().split(' ');
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        ctx.font = '900 88px Calibri, sans-serif';
+                        let result = '';
+                        for (const word of words) {
+                            const test = result ? result + ' ' + word : word;
+                            if (ctx.measureText(test).width > maxPx) break;
+                            result = test;
+                        }
+                        return result || words[0].substring(0, 6);
+                    })();
+
+                    const unitIsGrams = /^\d+G$/.test(item.unitText);
+                    const unitStyle = unitIsGrams ? ' style="font-size:25px !important;"' : '';
                     labelDiv.innerHTML = `
-                        <div class="talker-name">${item.displayName}</div>
+                        <div class="talker-name" style="width:${nameWidth} !important">${fitName}</div>
                         <div class="talker-price-container">
-                            <span class="talker-price">${formattedPrice}</span><span class="talker-unit">/${item.unitText}</span>
+                            <span class="talker-price">${formattedPriceHTML}</span><span class="talker-unit"${unitStyle}>/${item.unitText}</span>
                         </div>
                     `;
                     pageWrap.appendChild(labelDiv);
                 });
                 
-                if(chunk.length < 9) {
-                    for(let j=0; j < (9 - chunk.length); j++){
+                if(chunk.length < 8) {
+                    for(let j=0; j < (8 - chunk.length); j++){
                         const emptyBlock = document.createElement('div'); emptyBlock.className = 'talker-label';
                         emptyBlock.style.borderBottom = "none"; pageWrap.appendChild(emptyBlock);
                     }
