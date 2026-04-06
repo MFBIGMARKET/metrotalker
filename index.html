@@ -20,6 +20,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <!-- SheetJS for XLSX -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Dynamic page orientation — swapped by JS before print -->
+    <style id="page-orient">@media print { @page { size: A4 portrait; margin: 0; } }</style>
 
     <style>
         /* --- Google Material 3 Variables --- */
@@ -39,6 +41,8 @@
             --md-sys-color-inverse-surface: #313033;
             --md-sys-color-inverse-on-surface: #f4eff4;
             --red-print: #d93025;
+            --offer-yellow: #FFD700;
+            --offer-green: #4CAF50;
             --radius-sm: 8px;
             --radius-md: 16px;
             --radius-lg: 24px;
@@ -46,189 +50,84 @@
             --transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
         }
 
-        body {
-            margin: 0; padding: 0; font-family: var(--font-family);
-            background-color: var(--md-sys-color-surface);
-            color: var(--md-sys-color-on-surface);
-            -webkit-font-smoothing: antialiased;
-        }
-
+        body { margin: 0; padding: 0; font-family: var(--font-family); background-color: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); -webkit-font-smoothing: antialiased; }
         * { box-sizing: border-box; }
         .hidden { display: none !important; }
-
-        /* --- Typography & Icons --- */
         h1, h2, h3, p { margin: 0; font-weight: 400; }
         .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
         /* --- Toggle Switch --- */
         .toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; }
         .toggle-switch input { opacity: 0; width: 0; height: 0; }
-        .toggle-slider {
-            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #ccc; border-radius: 20px; transition: 0.2s;
-        }
-        .toggle-slider:before {
-            position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
-            background-color: white; border-radius: 50%; transition: 0.2s;
-        }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; border-radius: 20px; transition: 0.2s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: 0.2s; }
         .toggle-switch input:checked + .toggle-slider { background-color: var(--md-sys-color-primary); }
         .toggle-switch input:checked + .toggle-slider:before { transform: translateX(16px); }
 
         /* --- App Bar --- */
-        .app-bar {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 16px 24px; height: 64px; background-color: var(--md-sys-color-surface);
-            position: sticky; top: 0; z-index: 10;
-        }
-        .app-bar-title {
-            font-size: 22px; color: var(--md-sys-color-on-surface);
-            display: flex; align-items: center; gap: 12px;
-        }
-        .icon-btn {
-            background: transparent; border: none; width: 48px; height: 48px;
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; color: var(--md-sys-color-on-surface-variant); transition: var(--transition);
-        }
+        .app-bar { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; height: 64px; background-color: var(--md-sys-color-surface); position: sticky; top: 0; z-index: 10; }
+        .app-bar-title { font-size: 22px; color: var(--md-sys-color-on-surface); display: flex; align-items: center; gap: 12px; }
+        .icon-btn { background: transparent; border: none; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--md-sys-color-on-surface-variant); transition: var(--transition); }
         .icon-btn:hover { background-color: var(--md-sys-color-surface-container-high); }
 
         /* --- Home View --- */
-        .home-container {
-            display: flex; justify-content: center; align-items: center; gap: 32px;
-            min-height: calc(100vh - 100px); padding: 24px; flex-wrap: wrap;
-        }
-        .square-card-btn {
-            width: 260px; height: 260px; border-radius: var(--radius-lg);
-            background-color: var(--md-sys-color-surface-container); border: none;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: 16px; cursor: pointer; transition: var(--transition); color: var(--md-sys-color-on-surface); padding: 24px;
-        }
-        .square-card-btn:hover {
-            background-color: var(--md-sys-color-primary-container);
-            transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
+        .home-container { display: flex; justify-content: center; align-items: center; gap: 32px; min-height: calc(100vh - 100px); padding: 24px; flex-wrap: wrap; }
+        .square-card-btn { width: 260px; height: 260px; border-radius: var(--radius-lg); background-color: var(--md-sys-color-surface-container); border: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; cursor: pointer; transition: var(--transition); color: var(--md-sys-color-on-surface); padding: 24px; }
+        .square-card-btn:hover { background-color: var(--md-sys-color-primary-container); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         .square-card-btn .material-symbols-outlined { font-size: 64px; color: var(--md-sys-color-primary); }
         .square-card-btn span.label { font-size: 18px; font-weight: 500; }
-        .daily-status {
-            font-size: 13px; color: var(--md-sys-color-on-surface-variant);
-            background: rgba(0,0,0,0.05); padding: 6px 12px; border-radius: 100px; margin-top: 8px;
-        }
+        .square-card-btn.offer-btn { background-color: #fff8e1; }
+        .square-card-btn.offer-btn:hover { background-color: #fff3cd; }
+        .square-card-btn.offer-btn .material-symbols-outlined { color: #e65100; }
+        .daily-status { font-size: 13px; color: var(--md-sys-color-on-surface-variant); background: rgba(0,0,0,0.05); padding: 6px 12px; border-radius: 100px; margin-top: 8px; }
 
         /* --- Settings View --- */
-        #settings-view {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--md-sys-color-surface); z-index: 20; display: flex; flex-direction: column;
-        }
-        
-        .tabs-header {
-            display: flex; justify-content: center; border-bottom: 1px solid var(--md-sys-color-surface-container-high); background: var(--md-sys-color-surface);
-        }
-        .tab-btn {
-            background: none; border: none; padding: 16px 24px; font-size: 14px;
-            font-weight: 500; color: var(--md-sys-color-on-surface-variant);
-            cursor: pointer; position: relative; transition: var(--transition);
-        }
+        #settings-view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--md-sys-color-surface); z-index: 20; display: flex; flex-direction: column; }
+        .tabs-header { display: flex; justify-content: center; border-bottom: 1px solid var(--md-sys-color-surface-container-high); background: var(--md-sys-color-surface); overflow-x: auto; }
+        .tab-btn { background: none; border: none; padding: 16px 20px; font-size: 14px; font-weight: 500; color: var(--md-sys-color-on-surface-variant); cursor: pointer; position: relative; transition: var(--transition); white-space: nowrap; }
         .tab-btn.active { color: var(--md-sys-color-primary); }
-        .tab-btn.active::after {
-            content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
-            background: var(--md-sys-color-primary); border-radius: 3px 3px 0 0;
-        }
+        .tab-btn.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: var(--md-sys-color-primary); border-radius: 3px 3px 0 0; }
         .tab-btn:hover:not(.active) { background: var(--md-sys-color-surface-container); }
-
-        .tab-content { flex-grow: 1; padding: 32px 24px; max-width: 1000px; margin: 0 auto; width: 100%; overflow-y: auto; }
+        .tab-content { flex-grow: 1; padding: 32px 24px; max-width: 1100px; margin: 0 auto; width: 100%; overflow-y: auto; }
 
         /* --- UI Elements --- */
-        .card {
-            background: var(--md-sys-color-surface); border: 1px solid var(--md-sys-color-surface-container-high);
-            border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px;
-        }
-        
-        .btn-filled, .btn-tonal, .btn-error-tonal, .md-text-field {
-            height: 40px; box-sizing: border-box; font-family: var(--font-family); font-size: 14px;
-        }
-
-        .btn-filled {
-            background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
-            border: none; padding: 0 24px; border-radius: 100px; font-weight: 500; cursor: pointer;
-            display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: var(--transition);
-        }
+        .card { background: var(--md-sys-color-surface); border: 1px solid var(--md-sys-color-surface-container-high); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px; }
+        .btn-filled, .btn-tonal, .btn-error-tonal, .md-text-field { height: 40px; box-sizing: border-box; font-family: var(--font-family); font-size: 14px; }
+        .btn-filled { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border: none; padding: 0 24px; border-radius: 100px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: var(--transition); }
         .btn-filled:hover { background: #0842a0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        
-        .btn-tonal {
-            background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface);
-            border: none; padding: 0 24px; border-radius: 100px; font-weight: 500; cursor: pointer;
-            display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: var(--transition);
-        }
+        .btn-tonal { background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface); border: none; padding: 0 24px; border-radius: 100px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: var(--transition); }
         .btn-tonal:hover { background: var(--md-sys-color-surface-container-high); }
-
-        .btn-error-tonal {
-            background: var(--md-sys-color-error-container); color: var(--md-sys-color-error);
-            border: none; padding: 0 24px; border-radius: 100px; font-weight: 500; cursor: pointer;
-            display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: var(--transition);
-        }
+        .btn-error-tonal { background: var(--md-sys-color-error-container); color: var(--md-sys-color-error); border: none; padding: 0 24px; border-radius: 100px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: var(--transition); }
         .btn-error-tonal:hover { background: #f2c8c5; }
-        
-        .btn-error-filled {
-            background: var(--md-sys-color-error); color: white; border: none; padding: 0 24px; border-radius: 100px;
-            font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
-        }
+        .btn-error-filled { background: var(--md-sys-color-error); color: white; border: none; padding: 0 24px; border-radius: 100px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
         .btn-error-filled:hover { background: #8c1d18; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-
-        .md-text-field {
-            border: 1px solid var(--md-sys-color-surface-container-high);
-            background: var(--md-sys-color-surface-container); padding: 0 16px;
-            border-radius: var(--radius-sm); transition: var(--transition);
-        }
+        .btn-orange { background: #e65100; color: white; border: none; padding: 0 24px; border-radius: 100px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; font-family: var(--font-family); font-size: 14px; transition: var(--transition); }
+        .btn-orange:hover { background: #bf360c; }
+        .md-text-field { border: 1px solid var(--md-sys-color-surface-container-high); background: var(--md-sys-color-surface-container); padding: 0 16px; border-radius: var(--radius-sm); transition: var(--transition); }
         .md-text-field:focus { outline: none; border-color: var(--md-sys-color-primary); background: var(--md-sys-color-surface); }
 
-        /* --- Snackbar / Toast --- */
-        #snackbar {
-            visibility: hidden; min-width: 250px; background-color: var(--md-sys-color-inverse-surface);
-            color: var(--md-sys-color-inverse-on-surface); text-align: center; border-radius: 8px;
-            padding: 14px 24px; position: fixed; z-index: 1000; left: 50%; bottom: 30px;
-            transform: translateX(-50%) translateY(20px); font-size: 14px; opacity: 0;
-            transition: opacity 0.3s, transform 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 12px;
-        }
+        /* --- Snackbar --- */
+        #snackbar { visibility: hidden; min-width: 250px; background-color: var(--md-sys-color-inverse-surface); color: var(--md-sys-color-inverse-on-surface); text-align: center; border-radius: 8px; padding: 14px 24px; position: fixed; z-index: 1000; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(20px); font-size: 14px; opacity: 0; transition: opacity 0.3s, transform 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 12px; }
         #snackbar.show { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
 
-        /* --- Master List Table --- */
-        .table-wrap {
-            border: 1px solid var(--md-sys-color-surface-container-high); border-radius: var(--radius-md);
-            overflow: hidden; background: var(--md-sys-color-surface);
-        }
+        /* --- Table --- */
+        .table-wrap { border: 1px solid var(--md-sys-color-surface-container-high); border-radius: var(--radius-md); overflow: hidden; background: var(--md-sys-color-surface); }
         table { width: 100%; border-collapse: collapse; text-align: left; }
-        thead th {
-            background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface-variant);
-            font-weight: 500; font-size: 14px; padding: 16px; border-bottom: 1px solid var(--md-sys-color-surface-container-high);
-        }
-        tbody td {
-            padding: 12px 16px; border-bottom: 1px solid var(--md-sys-color-surface-container-high);
-            font-size: 14px; color: var(--md-sys-color-on-surface); vertical-align: middle;
-        }
+        thead th { background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface-variant); font-weight: 500; font-size: 14px; padding: 16px; border-bottom: 1px solid var(--md-sys-color-surface-container-high); }
+        tbody td { padding: 12px 16px; border-bottom: 1px solid var(--md-sys-color-surface-container-high); font-size: 14px; color: var(--md-sys-color-on-surface); vertical-align: middle; }
         tbody tr:last-child td { border-bottom: none; }
-        
-        .md-input-small {
-            border: 1px solid var(--md-sys-color-surface-container-high); background: var(--md-sys-color-surface-container);
-            padding: 6px 12px; border-radius: var(--radius-sm); font-family: var(--font-family); font-size: 14px; width: 80px;
-        }
+        .md-input-small { border: 1px solid var(--md-sys-color-surface-container-high); background: var(--md-sys-color-surface-container); padding: 6px 12px; border-radius: var(--radius-sm); font-family: var(--font-family); font-size: 14px; width: 80px; }
         .md-input-small:focus { outline: none; border-color: var(--md-sys-color-primary); background: var(--md-sys-color-surface); }
         .editable-cell { padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid transparent; min-width: 150px; }
         .editable-cell:hover, .editable-cell:focus { background: var(--md-sys-color-surface-container); border-color: var(--md-sys-color-surface-container-high); outline: none; }
 
-        /* --- Dialog / Modals --- */
-        .dialog-scrim {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 50; display: flex;
-            align-items: center; justify-content: center; backdrop-filter: blur(2px);
-        }
-        .dialog-container {
-            background: var(--md-sys-color-surface); border-radius: var(--radius-lg); width: 90%; max-width: 600px;
-            max-height: 85vh; display: flex; flex-direction: column;
-            box-shadow: 0 24px 38px 3px rgba(0,0,0,0.14), 0 9px 46px 8px rgba(0,0,0,0.12), 0 11px 15px -7px rgba(0,0,0,0.2);
-        }
+        /* --- Dialog --- */
+        .dialog-scrim { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 50; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .dialog-container { background: var(--md-sys-color-surface); border-radius: var(--radius-lg); width: 90%; max-width: 600px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 24px 38px 3px rgba(0,0,0,0.14), 0 9px 46px 8px rgba(0,0,0,0.12), 0 11px 15px -7px rgba(0,0,0,0.2); }
         .dialog-header { padding: 24px; padding-bottom: 16px; }
         .dialog-header h2 { font-size: 24px; }
         .dialog-content { padding: 0; overflow-y: auto; flex-grow: 1; }
         .dialog-actions { padding: 24px; display: flex; justify-content: flex-end; gap: 8px; }
-
         .list-item { display: flex; align-items: center; padding: 12px 24px; gap: 16px; cursor: pointer; transition: background 0.15s; }
         .list-item:hover { background: var(--md-sys-color-surface-container); }
         .list-item-text { flex-grow: 1; }
@@ -236,96 +135,241 @@
         .list-item-subtitle { font-size: 14px; color: var(--md-sys-color-on-surface-variant); }
         input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--md-sys-color-primary); cursor: pointer; }
 
+        /* --- Offer Photo Thumb --- */
+        .offer-photo-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--md-sys-color-surface-container-high); }
+        .offer-photo-placeholder { width: 48px; height: 48px; border-radius: 6px; border: 2px dashed var(--md-sys-color-surface-container-high); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--md-sys-color-on-surface-variant); }
+        .offer-photo-placeholder:hover { background: var(--md-sys-color-surface-container); }
+
+        /* --- Logo Preview --- */
+        .logo-preview { max-height: 60px; max-width: 200px; object-fit: contain; border-radius: 6px; }
+
+        /* --- Offer Print Dialog --- */
+        .offer-print-card {
+            border: 1px solid var(--md-sys-color-surface-container-high);
+            border-radius: var(--radius-md); padding: 16px; margin-bottom: 12px;
+            display: flex; gap: 16px; align-items: center;
+        }
+        .offer-print-card img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+        .offer-print-card .no-img { width: 56px; height: 56px; border-radius: 6px; background: var(--md-sys-color-surface-container); display: flex; align-items:center; justify-content: center; color: var(--md-sys-color-on-surface-variant); flex-shrink: 0; }
+        .offer-edit-name { font-size: 15px; font-weight: 500; border: 1px solid var(--md-sys-color-surface-container-high); border-radius: 6px; padding: 4px 8px; width: 100%; background: var(--md-sys-color-surface-container); font-family: var(--font-family); }
+        .offer-edit-price { font-size: 15px; border: 1px solid var(--md-sys-color-surface-container-high); border-radius: 6px; padding: 4px 8px; width: 90px; background: var(--md-sys-color-surface-container); font-family: var(--font-family); }
+        .offer-edit-mrp { font-size: 14px; border: 1px solid var(--md-sys-color-surface-container-high); border-radius: 6px; padding: 4px 8px; width: 90px; background: var(--md-sys-color-surface-container); font-family: var(--font-family); }
+
         /* --- Print Specific Styling --- */
         @media screen { #print-area { display: none !important; } }
-        
+
         @media print {
-            @page { size: A4 portrait; margin: 0; }
             body * { display: none !important; }
             #print-area, #print-area * { display: flex !important; visibility: visible; }
             #print-area { display: block !important; position: absolute; top: 0; left: 0; width: 100%; background: white; }
-            
+
+            /* === REGULAR TALKER PRINT === */
             .print-page {
                 display: flex !important; flex-direction: column !important; width: 210mm; height: 297mm;
                 page-break-after: always; box-sizing: border-box; padding: 0; margin: 0;
             }
-            
-            /* Print Row Grid - Exact 8 divisions of page */
             .talker-label {
                 display: flex !important; flex-direction: row !important;
                 justify-content: flex-start !important; align-items: center !important;
                 height: calc(100% / 8) !important;
                 width: 100%; padding: 0 5mm 0 5mm !important;
                 box-sizing: border-box;
+                position: relative !important;
                 border-bottom: 2px dashed #aaa !important;
             }
-
-            .talker-label:last-child {
-                border-bottom: none !important;
-            }
-
-            /* LEFT COLUMN: fixed 55% so price always starts at same spot */
+            .talker-label:last-child { border-bottom: none !important; }
             .talker-name {
-                display: block !important;
-                width: 65% !important;
-                flex-shrink: 0 !important;
-                flex-grow: 0 !important;
-                padding-right: 4mm !important;
-                box-sizing: border-box !important;
-                color: var(--red-print) !important;
-                font-size: 88px !important;
-                font-weight: 900 !important;
-                -webkit-text-stroke: 1px var(--red-print) !important;
-                white-space: nowrap !important;
-                overflow: hidden !important;
-                text-align: left !important;
-                text-transform: uppercase !important;
-                font-family: 'Calibri', sans-serif !important;
-                line-height: 1 !important;
+                display: block !important; width: 65% !important; flex-shrink: 0 !important; flex-grow: 0 !important;
+                padding-right: 4mm !important; box-sizing: border-box !important; color: var(--red-print) !important;
+                font-size: 88px !important; font-weight: 900 !important; -webkit-text-stroke: 1px var(--red-print) !important;
+                white-space: nowrap !important; overflow: hidden !important; text-align: left !important;
+                text-transform: uppercase !important; font-family: 'Calibri', sans-serif !important; line-height: 1 !important;
             }
-
-            /* RIGHT COLUMN: left-aligned from the 55% mark, consistent across all rows */
             .talker-price-container {
-                flex-shrink: 0 !important;
-                flex-grow: 0 !important;
-                display: flex !important;
-                flex-direction: row !important;
-                justify-content: flex-start !important;
-                align-items: baseline !important;
-                white-space: nowrap !important;
+                flex-shrink: 0 !important; flex-grow: 0 !important; display: flex !important; flex-direction: row !important;
+                justify-content: flex-start !important; align-items: baseline !important; white-space: nowrap !important;
             }
-            /* Big price number — inline-block so sup stays within it */
             .talker-price {
-                color: #000 !important;
-                font-size: 92px !important;
-                font-weight: 900 !important;
-                font-family: 'Calibri', sans-serif !important;
-                line-height: 1 !important;
-                display: inline-block !important;
-                white-space: nowrap !important;
-                vertical-align: baseline !important;
+                color: #000 !important; font-size: 92px !important; font-weight: 900 !important;
+                font-family: 'Calibri', sans-serif !important; line-height: 1 !important;
+                display: inline-block !important; white-space: nowrap !important; vertical-align: baseline !important;
             }
-            /* Decimal: top of number, not top of line */
             .talker-decimal {
-                font-size: 28px !important;
-                font-weight: 700 !important;
-                font-family: 'Calibri', sans-serif !important;
-                color: #000 !important;
-                vertical-align: top !important;
-                position: relative !important;
-                top: 14px !important;
-                line-height: 1 !important;
+                font-size: 28px !important; font-weight: 700 !important; font-family: 'Calibri', sans-serif !important;
+                color: #000 !important; vertical-align: top !important; position: relative !important; top: 14px !important; line-height: 1 !important;
             }
             .talker-unit {
-                color: #000 !important;
-                font-size: 44px !important;
+                color: #000 !important; font-size: 44px !important; font-weight: 700 !important;
+                font-family: 'Calibri', sans-serif !important; line-height: 1 !important; white-space: nowrap !important;
+                display: inline-block !important; vertical-align: baseline !important; margin-bottom: 4px !important;
+            }
+            .talker-plu {
+                position: absolute !important; bottom: 3px !important; left: 50% !important;
+                transform: translateX(-50%) !important; font-size: 20px !important;
+                font-family: 'Calibri', sans-serif !important; color: #999 !important;
+                letter-spacing: 0.5px !important; white-space: nowrap !important;
+            }
+
+            /* === OFFER TALKER PRINT — A4 Landscape, 4-up === */
+            .offer-print-page {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: wrap !important;
+                width: 297mm !important;
+                height: 210mm !important;
+                page-break-after: always !important;
+                box-sizing: border-box !important;
+                padding: 5mm !important;
+                gap: 4mm !important;
+                background: white !important;
+            }
+
+            /* Each quadrant — yellow outer card */
+            .offer-talker-card {
+                width: calc(50% - 2mm) !important;
+                height: calc(50% - 2mm) !important;
+                box-sizing: border-box !important;
+                display: flex !important;
+                flex-direction: column !important;
+                background: #FFD700 !important;
+                border-radius: 5mm !important;
+                overflow: hidden !important;
+                padding: 3mm 3mm 2mm 3mm !important;
+            }
+
+            /* Yellow top band: EVERY DAY + LOW PRICE */
+            .offer-top-band {
+                flex-shrink: 0 !important;
+                padding: 0 1mm 2mm 1mm !important;
+            }
+            .offer-top-text1 {
+                display: block !important;
+                color: #d32f2f !important;
                 font-weight: 700 !important;
-                font-family: 'Calibri', sans-serif !important;
+                font-size: 9pt !important;
+                font-family: Arial, sans-serif !important;
+                text-transform: uppercase !important;
+                line-height: 1.3 !important;
+            }
+            .offer-top-text2 {
+                display: block !important;
+                color: #d32f2f !important;
+                font-weight: 900 !important;
+                font-size: 14pt !important;
+                font-family: Arial, sans-serif !important;
+                text-transform: uppercase !important;
+                line-height: 1.1 !important;
+            }
+
+            /* White rounded inner card */
+            .offer-content-area {
+                flex-grow: 1 !important;
+                background: white !important;
+                border-radius: 4mm 4mm 2mm 2mm !important;
+                display: flex !important;
+                flex-direction: column !important;
+                padding: 2mm 3mm 2mm 3mm !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+                position: relative !important;
+            }
+
+            /* Item name top-left inside white card */
+            .offer-item-name {
+                display: block !important;
+                font-size: 16pt !important;
+                font-weight: 900 !important;
+                font-family: Arial, sans-serif !important;
+                color: #111 !important;
+                text-transform: uppercase !important;
+                line-height: 1.1 !important;
+                margin-bottom: 1mm !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+            }
+
+            /* Row: photo left | price right */
+            .offer-body-row {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: flex-end !important;
+                flex-grow: 1 !important;
+            }
+
+            .offer-product-img {
+                width: 30mm !important;
+                height: 30mm !important;
+                object-fit: cover !important;
+                border-radius: 2mm !important;
+                flex-shrink: 0 !important;
+                display: block !important;
+                align-self: flex-end !important;
+            }
+            .offer-no-img {
+                width: 30mm !important;
+                height: 30mm !important;
+                flex-shrink: 0 !important;
+                background: #f0f0f0 !important;
+                border-radius: 2mm !important;
+                display: block !important;
+                align-self: flex-end !important;
+            }
+
+            /* Price + logo stacked on right */
+            .offer-price-col {
+                flex-grow: 1 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: flex-end !important;
+                justify-content: flex-end !important;
+                gap: 1mm !important;
+            }
+
+            /* Massive red price */
+            .offer-big-price {
+                display: flex !important;
+                align-items: flex-start !important;
+                color: #d32f2f !important;
+                font-size: 52pt !important;
+                font-weight: 900 !important;
+                font-family: Arial, sans-serif !important;
                 line-height: 1 !important;
                 white-space: nowrap !important;
-                display: inline-block !important;
-                vertical-align: baseline !important;
-                margin-bottom: 4px !important;
+            }
+            .offer-big-price-dec {
+                font-size: 20pt !important;
+                font-weight: 700 !important;
+                color: #d32f2f !important;
+                font-family: Arial, sans-serif !important;
+                line-height: 1 !important;
+                margin-top: 5pt !important;
+            }
+
+            /* Logo bottom-right */
+            .offer-logo {
+                height: 8mm !important;
+                max-width: 28mm !important;
+                object-fit: contain !important;
+                display: block !important;
+                align-self: flex-end !important;
+            }
+            .offer-logo-placeholder { display: none !important; }
+
+            /* Green bottom strip on yellow card */
+            .offer-green-strip {
+                height: 3mm !important;
+                background: #8BC34A !important;
+                border-radius: 0 0 3mm 3mm !important;
+                flex-shrink: 0 !important;
+                margin: 1mm -3mm -2mm -3mm !important;
+            }
+        }
+
+        /* Offer page needs landscape */
+        @media print {
+            .offer-print-page ~ .print-page,
+            .print-page ~ .offer-print-page {
+                page-break-before: always;
             }
         }
     </style>
@@ -348,6 +392,11 @@
             <button class="square-card-btn" onclick="openGenerateDialog()">
                 <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">print</span>
                 <span class="label">Generate Talkers</span>
+            </button>
+
+            <button class="square-card-btn offer-btn" onclick="openOfferPrintDialog()">
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">local_offer</span>
+                <span class="label">Offer Talker</span>
             </button>
             
             <button class="square-card-btn" onclick="document.getElementById('daily-upload-input').click()">
@@ -372,10 +421,11 @@
 
         <div class="tabs-header">
             <button class="tab-btn" onclick="switchTab('tab-list')" id="btn-tab-list">Master List</button>
+            <button class="tab-btn" onclick="switchTab('tab-offer')" id="btn-tab-offer">Offer Items</button>
             <button class="tab-btn" onclick="switchTab('tab-data')" id="btn-tab-data">Data & Upload</button>
         </div>
 
-        <!-- Tab 1: Master List (DEFAULT) -->
+        <!-- Tab 1: Master List -->
         <div class="tab-content" id="tab-list">
             <div class="table-wrap">
                 <table>
@@ -389,9 +439,7 @@
                             <th style="width: 80px; text-align:center;">Active</th>
                         </tr>
                     </thead>
-                    <tbody id="items-tbody">
-                        <!-- Rendered by JS -->
-                    </tbody>
+                    <tbody id="items-tbody"></tbody>
                 </table>
                 <div id="empty-state" style="padding: 48px; text-align: center; color: var(--md-sys-color-on-surface-variant); display: none;">
                     <span class="material-symbols-outlined" style="font-size: 48px; opacity: 0.5;">database</span>
@@ -400,9 +448,31 @@
             </div>
         </div>
 
-        <!-- Tab 2: Data Management -->
+        <!-- Tab 2: Offer Items -->
+        <div class="tab-content hidden" id="tab-offer">
+            <p style="font-size: 13px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 16px;">All items are from the master list. Upload a product photo and mark items active to include them in offer prints. Name and price can be edited at print time.</p>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 68px;">Photo</th>
+                            <th style="width: 80px;">PLU</th>
+                            <th>Name</th>
+                            <th>Current Price</th>
+                            <th style="width: 100px; text-align:center;">Offer Active</th>
+                        </tr>
+                    </thead>
+                    <tbody id="offer-tbody"></tbody>
+                </table>
+                <div id="offer-empty-state" style="padding: 48px; text-align: center; color: var(--md-sys-color-on-surface-variant); display: none;">
+                    <span class="material-symbols-outlined" style="font-size: 48px; opacity: 0.5;">database</span>
+                    <p style="margin-top: 16px;">No master data loaded. Go to the Data &amp; Upload tab to start.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Data Management -->
         <div class="tab-content hidden" id="tab-data">
-            
             <div class="card" style="display: flex; align-items: center; justify-content: space-between;">
                 <div>
                     <h3 style="font-size: 16px; font-weight: 500;">Master PLU File</h3>
@@ -426,6 +496,24 @@
                 </div>
             </div>
 
+            <div class="card">
+                <h3 style="font-size: 16px; font-weight: 500; margin-bottom: 16px;">Company Logo</h3>
+                <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                    <div id="logo-preview-wrap" style="display: none;">
+                        <img id="logo-preview-img" class="logo-preview" src="" alt="Logo">
+                    </div>
+                    <div>
+                        <button class="btn-tonal" onclick="document.getElementById('logo-upload-input').click()">
+                            <span class="material-symbols-outlined" style="font-size: 18px;">add_photo_alternate</span> Upload Logo
+                        </button>
+                        <input type="file" id="logo-upload-input" accept="image/*" class="hidden" onchange="handleLogoUpload(event)">
+                        <button class="btn-error-tonal" style="margin-left: 8px; display: none;" id="remove-logo-btn" onclick="removeLogo()">
+                            <span class="material-symbols-outlined" style="font-size: 18px;">delete</span> Remove
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="card" style="border-color: var(--md-sys-color-error-container); display: flex; align-items: center; justify-content: space-between;">
                 <div>
                     <h3 style="color: var(--md-sys-color-error); font-size: 16px; font-weight: 500;">Danger Zone</h3>
@@ -436,10 +524,9 @@
                 </button>
             </div>
         </div>
-
     </div>
 
-    <!-- GENERATE DIALOG -->
+    <!-- GENERATE DIALOG (regular talkers) -->
     <div class="dialog-scrim hidden" id="generate-dialog">
         <div class="dialog-container">
             <div class="dialog-header">
@@ -462,6 +549,26 @@
         </div>
     </div>
 
+    <!-- OFFER PRINT DIALOG -->
+    <div class="dialog-scrim hidden" id="offer-print-dialog">
+        <div class="dialog-container" style="max-width: 680px;">
+            <div class="dialog-header">
+                <h2>Offer Talkers — Edit & Print</h2>
+                <p style="font-size: 13px; color: var(--md-sys-color-on-surface-variant); margin-top: 6px;">Edit name or price before printing. 4 per A4 landscape page.</p>
+            </div>
+            <div style="padding: 8px 24px; border-bottom: 1px solid var(--md-sys-color-surface-container-high);">
+                <input type="text" id="offer-dialog-search" placeholder="Search offer items..." class="md-text-field" style="width:100%; height:38px;" oninput="filterOfferDialogItems(this.value)">
+            </div>
+            <div class="dialog-content" id="offer-dialog-body" style="padding: 16px 24px;"></div>
+            <div class="dialog-actions">
+                <button class="btn-tonal" style="background: transparent;" onclick="closeOfferPrintDialog()">Cancel</button>
+                <button class="btn-orange" onclick="generateOfferPDF()">
+                    <span class="material-symbols-outlined">picture_as_pdf</span> Print Offers
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- DELETE CONFIRM DIALOG -->
     <div class="dialog-scrim hidden" id="delete-dialog">
         <div class="dialog-container" style="max-width: 400px; max-height: unset;">
@@ -469,7 +576,7 @@
                 <h2 style="color: var(--md-sys-color-on-surface);">Clear All Data?</h2>
             </div>
             <div class="dialog-content" style="padding: 0 24px 24px; color: var(--md-sys-color-on-surface-variant); line-height: 1.5;">
-                This will permanently delete all stored master items, custom names, and conversion ratios. This action cannot be undone.
+                This will permanently delete all stored master items, custom names, conversion ratios, offer items and logo. This action cannot be undone.
             </div>
             <div class="dialog-actions">
                 <button class="btn-tonal" style="background: transparent;" onclick="closeDeleteDialog()">Cancel</button>
@@ -486,26 +593,28 @@
 
     <!-- HIDDEN PRINT AREA -->
     <div id="print-area"></div>
+    <!-- Hidden file inputs for offer photos -->
+    <input type="file" id="offer-photo-file-input" accept="image/*" class="hidden" onchange="handleOfferPhotoUpload(event)">
 
     <script>
-        let appData = {}; 
+        let appData = {};
+        let offerData = {};   // { id: { id, plu, name, offerPrice, mrp, photo(base64), inactive } }
+        let companyLogo = null; // base64
+        let _pendingPhotoOfferId = null;
 
-        // PWA Service Worker Registration
+        // PWA Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(err => {
-                    console.log('ServiceWorker registration failed: ', err);
-                });
+                navigator.serviceWorker.register('./sw.js').catch(() => {});
             });
         }
 
-        // Initialization
+        // ===================== INIT =====================
         window.onload = () => {
             const savedData = localStorage.getItem('talker_appData_v2');
             if(savedData) {
                 try {
                     appData = JSON.parse(savedData);
-                    // Migrate fraction symbols back to plain unit labels
                     let migrated = false;
                     Object.values(appData).forEach(item => {
                         if(item.unitText === '½KG') { item.unitText = '500G'; migrated = true; }
@@ -516,22 +625,25 @@
                     renderTable();
                 } catch(e) { console.error("Could not parse local data"); }
             }
-            
+
+            const savedOffer = localStorage.getItem('talker_offerData_v1');
+            if(savedOffer) { try { offerData = JSON.parse(savedOffer); } catch(e) {} }
+
+            const savedLogo = localStorage.getItem('talker_logo');
+            if(savedLogo) { companyLogo = savedLogo; showLogoPreview(savedLogo); }
+
             const lastUpdated = localStorage.getItem('talker_last_updated');
-            if(lastUpdated) {
-                document.getElementById('daily-status-home').innerText = `Updated: ${lastUpdated}`;
-            }
+            if(lastUpdated) document.getElementById('daily-status-home').innerText = `Updated: ${lastUpdated}`;
 
             switchTab('tab-list');
         };
 
-        // UI Utilities
+        // ===================== UTILITIES =====================
         let snackbarTimeout;
         const showToast = (message, icon = 'info') => {
             const snackbar = document.getElementById("snackbar");
             document.getElementById("snackbar-text").innerText = message;
             document.getElementById("snackbar-icon").innerText = icon;
-            
             snackbar.className = "show";
             clearTimeout(snackbarTimeout);
             snackbarTimeout = setTimeout(() => { snackbar.className = snackbar.className.replace("show", ""); }, 4000);
@@ -543,47 +655,43 @@
             return '₹' + Number.parseFloat(num.toFixed(2)).toString();
         };
 
-        // Returns HTML: whole number with decimal as native superscript
         const formatPriceHTML = (val) => {
             const num = parseFloat(val);
             if(isNaN(num)) return `₹${Math.round(num)}`;
             const fixed = num.toFixed(2);
             const [whole, dec] = fixed.split('.');
-            if(dec && dec !== '00') {
-                return `₹${whole}<sup class="talker-decimal">.${dec}</sup>`;
-            }
+            if(dec && dec !== '00') return `₹${whole}<sup class="talker-decimal">.${dec}</sup>`;
             return `₹${whole}`;
         };
 
         const cleanItemName = (rawName) => {
-            return rawName.replace(/\(\d+\)/g, '') 
-                .replace(/\b(?:KG|MP|KA|SPL|PREMIUM|FRESH|OFFR|OFFER|NADAN|BOX|PIECE|PC)\b/gi, '') 
+            return rawName.replace(/\(\d+\)/g, '')
+                .replace(/\b(?:KG|MP|KA|SPL|PREMIUM|FRESH|OFFR|OFFER|NADAN|BOX|PIECE|PC)\b/gi, '')
                 .replace(/\s{2,}/g, ' ').trim();
         };
 
-        const saveData = () => {
-            localStorage.setItem('talker_appData_v2', JSON.stringify(appData));
-        };
+        const saveData = () => localStorage.setItem('talker_appData_v2', JSON.stringify(appData));
+        const saveOfferData = () => localStorage.setItem('talker_offerData_v1', JSON.stringify(offerData));
 
-        // Tabs Logic
+        // ===================== TABS & NAVIGATION =====================
         const openSettings = () => {
             document.getElementById('home-view').classList.add('hidden');
             document.getElementById('settings-view').classList.remove('hidden');
             renderTable();
         };
-
         const closeSettings = () => {
             document.getElementById('settings-view').classList.add('hidden');
             document.getElementById('home-view').classList.remove('hidden');
         };
 
         const switchTab = (tabId) => {
-            document.getElementById('tab-list').classList.add('hidden');
-            document.getElementById('tab-data').classList.add('hidden');
-            document.getElementById('btn-tab-list').classList.remove('active');
-            document.getElementById('btn-tab-data').classList.remove('active');
+            ['tab-list','tab-offer','tab-data'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+                document.getElementById('btn-' + id).classList.remove('active');
+            });
             document.getElementById(tabId).classList.remove('hidden');
             document.getElementById('btn-' + tabId).classList.add('active');
+            if(tabId === 'tab-offer') renderOfferTable();
         };
 
         const updateMasterStatus = () => {
@@ -598,188 +706,45 @@
             }
         };
 
-        // Single Item Add
-        window.addSingleItem = () => {
-            const plu = document.getElementById('single-plu').value.trim();
-            const rawName = document.getElementById('single-name').value.trim();
-            const price = parseFloat(document.getElementById('single-price').value);
-
-            if(!plu || !rawName || isNaN(price)) {
-                showToast("Please fill all fields (PLU, Name, Rate).", "error");
-                return;
-            }
-
-            let baseUnit = 'KG';
-            const upName = rawName.toUpperCase();
-            if(upName.includes('BOX')) baseUnit = 'BOX';
-            if(upName.includes('PIECE') || upName.includes(' PC')) baseUnit = 'PC';
-
-            const isUpdate = !!appData[plu];
-
-            appData[plu] = {
-                plu: plu,
-                rawName: rawName,
-                displayName: cleanItemName(rawName),
-                masterPrice: price,
-                currentPrice: price,
-                conversion: 1,
-                unitText: baseUnit
-            };
-
-            saveData();
-            updateMasterStatus();
-            renderTable();
-            
-            document.getElementById('single-plu').value = '';
-            document.getElementById('single-name').value = '';
-            document.getElementById('single-price').value = '';
-
-            showToast(isUpdate ? `Item ${plu} updated.` : `Item ${plu} added successfully.`, "check_circle");
-        };
-
-        // Master File Upload
-        window.handleMasterUpload = (e) => {
-            const file = e.target.files[0];
-            if(!file) return;
-
-            Papa.parse(file, {
-                header: true,
-                skipEmptyLines: true,
-                complete: function(results) {
-                    let newCount = 0;
-                    let updateCount = 0;
-
-                    results.data.forEach(row => {
-                        const plu = row['PLU No'] ? row['PLU No'].trim() : null;
-                        const basePriceStr = row['Unit Price'] || row['Unit Price '] || '0';
-                        const basePrice = parseFloat(basePriceStr.replace(/,/g, ''));
-                        
-                        if(plu) {
-                            if(!appData[plu]) {
-                                let baseUnit = 'KG';
-                                const upName = (row['Item Name'] || '').toUpperCase();
-                                if(upName.includes('BOX')) baseUnit = 'BOX';
-                                if(upName.includes('PIECE') || upName.includes(' PC')) baseUnit = 'PC';
-
-                                appData[plu] = {
-                                    plu: plu, rawName: row['Item Name'],
-                                    displayName: cleanItemName(row['Item Name']),
-                                    masterPrice: basePrice, currentPrice: basePrice,
-                                    conversion: 1, unitText: baseUnit
-                                };
-                                newCount++;
-                            } else {
-                                if (appData[plu].masterPrice !== basePrice) {
-                                    appData[plu].masterPrice = basePrice;
-                                    updateCount++;
-                                }
-                            }
-                        }
-                    });
-                    
-                    saveData();
-                    updateMasterStatus();
-                    renderTable(); 
-                    e.target.value = ''; 
-
-                    if(newCount > 0 || updateCount > 0) {
-                        showToast(`Master list processed: ${newCount} new added, ${updateCount} updated.`, "cloud_done");
-                    } else {
-                        showToast(`Master list processed: No new changes found.`, "done_all");
-                    }
-                }
-            });
-        };
-
-        // Daily File Upload (XLSX)
-        window.handleDailyUpload = (e) => {
-            const file = e.target.files[0];
-            if(!file) return;
-            
-            if(Object.keys(appData).length === 0) {
-                showToast("Please upload a Master PLU file in Settings first!", "error");
-                e.target.value = '';
-                return;
-            }
-
+        // ===================== LOGO =====================
+        const handleLogoUpload = (e) => {
+            const file = e.target.files[0]; if(!file) return;
             const reader = new FileReader();
-            reader.onload = function(ev) {
-                try {
-                    const wb = XLSX.read(ev.target.result, { type: 'array' });
-                    const ws = wb.Sheets[wb.SheetNames[0]];
-                    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-
-                    let headerIndex = -1;
-                    for(let i = 0; i < rows.length; i++) {
-                        if(rows[i][0] && rows[i][0].toString().trim() === 'PLU No') {
-                            headerIndex = i; break;
-                        }
-                    }
-
-                    if(headerIndex === -1) {
-                        showToast("Could not find 'PLU No' header row. Is this the right file?", "error");
-                        e.target.value = '';
-                        return;
-                    }
-
-                    let changedCount = 0;
-                    let checkedCount = 0;
-
-                    for(let i = headerIndex + 1; i < rows.length; i++) {
-                        const row = rows[i];
-                        const plu = row[0] ? row[0].toString().trim() : null;
-                        const price = row[3] ? parseFloat(row[3].toString().replace(/,/g, '')) : NaN;
-
-                        if(plu && !isNaN(price) && appData[plu]) {
-                            checkedCount++;
-                            if(appData[plu].currentPrice !== price) {
-                                appData[plu].currentPrice = price;
-                                changedCount++;
-                            }
-                        }
-                    }
-
-                    saveData();
-                    renderTable();
-
-                    const now = new Date();
-                    let dateString = now.toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
-                    localStorage.setItem('talker_last_updated', dateString);
-                    document.getElementById('daily-status-home').innerText = `Updated: ${dateString}`;
-                    e.target.value = '';
-
-                    if(changedCount > 0) {
-                        showToast(`Daily prices updated: ${changedCount} items changed prices.`, "price_check");
-                    } else {
-                        showToast(`Checked ${checkedCount} items. No price changes found.`, "done_all");
-                    }
-                } catch(err) {
-                    showToast("Failed to read XLSX file. Please check the format.", "error");
-                    e.target.value = '';
-                }
+            reader.onload = (ev) => {
+                companyLogo = ev.target.result;
+                localStorage.setItem('talker_logo', companyLogo);
+                showLogoPreview(companyLogo);
+                showToast("Logo uploaded successfully.", "check_circle");
             };
-            reader.readAsArrayBuffer(file);
+            reader.readAsDataURL(file);
+            e.target.value = '';
+        };
+        const showLogoPreview = (src) => {
+            document.getElementById('logo-preview-img').src = src;
+            document.getElementById('logo-preview-wrap').style.display = 'block';
+            document.getElementById('remove-logo-btn').style.display = 'inline-flex';
+        };
+        const removeLogo = () => {
+            companyLogo = null;
+            localStorage.removeItem('talker_logo');
+            document.getElementById('logo-preview-wrap').style.display = 'none';
+            document.getElementById('remove-logo-btn').style.display = 'none';
+            showToast("Logo removed.", "delete");
         };
 
-        // Table Rendering & Editing
+        // ===================== MASTER TABLE =====================
         const renderTable = () => {
             const items = Object.values(appData);
             const tbody = document.getElementById('items-tbody');
             const emptyState = document.getElementById('empty-state');
-            
-            if(items.length === 0) {
-                tbody.innerHTML = ''; emptyState.style.display = 'block'; return;
-            }
+            if(items.length === 0) { tbody.innerHTML = ''; emptyState.style.display = 'block'; return; }
             emptyState.style.display = 'none'; tbody.innerHTML = '';
-
             items.sort((a,b) => a.displayName.localeCompare(b.displayName)).forEach(item => {
                 const tr = document.createElement('tr');
                 const calcPrice = item.currentPrice * item.conversion;
                 const finalLabel = `${formatPrice(calcPrice)}/${item.unitText}`;
                 const isInactive = !!item.inactive;
-
                 if(isInactive) tr.style.opacity = '0.4';
-
                 tr.innerHTML = `
                     <td style="color:var(--md-sys-color-on-surface-variant);">${item.plu}</td>
                     <td><div class="editable-cell" contenteditable="true" onblur="updateName('${item.plu}', this.innerText)">${item.displayName}</div></td>
@@ -798,21 +763,15 @@
         };
 
         window.updateName = (plu, newName) => {
-            if(appData[plu]) {
-                appData[plu].displayName = newName.trim() || appData[plu].rawName;
-                saveData();
-            }
+            if(appData[plu]) { appData[plu].displayName = newName.trim() || appData[plu].rawName; saveData(); }
         };
 
         window.updateConversion = (plu, val) => {
             if(appData[plu]) {
                 const numVal = parseFloat(val) || 1;
                 appData[plu].conversion = numVal;
-
-                if (numVal > 0 && numVal < 1) {
-                    // Any decimal < 1 → grams, e.g. 0.7 → 700G
-                    const grams = Math.round(numVal * 1000);
-                    appData[plu].unitText = `${grams}G`;
+                if(numVal > 0 && numVal < 1) {
+                    appData[plu].unitText = `${Math.round(numVal * 1000)}G`;
                 } else {
                     let baseUnit = 'KG';
                     const upName = appData[plu].rawName.toUpperCase();
@@ -820,43 +779,172 @@
                     if(upName.includes('PIECE') || upName.includes(' PC')) baseUnit = 'PC';
                     appData[plu].unitText = baseUnit;
                 }
-                
                 const calcPrice = appData[plu].currentPrice * appData[plu].conversion;
-                const finalLabel = `${formatPrice(calcPrice)}/${appData[plu].unitText}`;
-                document.getElementById(`res-${plu}`).innerText = finalLabel;
+                document.getElementById(`res-${plu}`).innerText = `${formatPrice(calcPrice)}/${appData[plu].unitText}`;
                 saveData();
             }
         };
 
         window.toggleActive = (plu, isActive) => {
-            if(appData[plu]) {
-                appData[plu].inactive = !isActive;
-                saveData();
-                renderTable();
-            }
+            if(appData[plu]) { appData[plu].inactive = !isActive; saveData(); renderTable(); }
         };
 
-        // Dialog Handlers
-        const openDeleteDialog = () => { document.getElementById('delete-dialog').classList.remove('hidden'); };
-        const closeDeleteDialog = () => { document.getElementById('delete-dialog').classList.add('hidden'); };
-        const confirmClearData = () => {
-            appData = {}; saveData();
-            localStorage.removeItem('talker_last_updated');
-            document.getElementById('daily-status-home').innerText = 'No recent updates';
-            updateMasterStatus(); renderTable(); closeDeleteDialog();
-            showToast("All data cleared successfully.", "delete");
+        // ===================== OFFER TABLE =====================
+        // offerData keyed by PLU: { photo, offerActive }
+        // Name & price always come from appData
+
+        const renderOfferTable = () => {
+            const items = Object.values(appData);
+            const tbody = document.getElementById('offer-tbody');
+            const emptyState = document.getElementById('offer-empty-state');
+            if(items.length === 0) { tbody.innerHTML = ''; emptyState.style.display = 'block'; return; }
+            emptyState.style.display = 'none'; tbody.innerHTML = '';
+            items.sort((a,b) => a.displayName.localeCompare(b.displayName)).forEach(item => {
+                const offerMeta = offerData[item.plu] || {};
+                const isOfferActive = !!offerMeta.offerActive;
+                const calcPrice = item.currentPrice * item.conversion;
+                const tr = document.createElement('tr');
+                if(!isOfferActive) tr.style.opacity = '0.45';
+                const photoCell = offerMeta.photo
+                    ? `<img src="${offerMeta.photo}" class="offer-photo-thumb" alt="" onclick="triggerOfferPhoto('${item.plu}')" style="cursor:pointer;" title="Click to change">`
+                    : `<div class="offer-photo-placeholder" onclick="triggerOfferPhoto('${item.plu}')" title="Upload photo"><span class="material-symbols-outlined" style="font-size:20px;">add_photo_alternate</span></div>`;
+                tr.innerHTML = `
+                    <td>${photoCell}</td>
+                    <td style="color:var(--md-sys-color-on-surface-variant);">${item.plu}</td>
+                    <td>${item.displayName}</td>
+                    <td>${formatPrice(calcPrice)}/${item.unitText}</td>
+                    <td style="text-align:center;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" ${isOfferActive ? 'checked' : ''} onchange="toggleOfferActive('${item.plu}', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
         };
 
+        window.toggleOfferActive = (plu, isActive) => {
+            if(!offerData[plu]) offerData[plu] = {};
+            offerData[plu].offerActive = isActive;
+            saveOfferData();
+            renderOfferTable();
+        };
+
+        window.triggerOfferPhoto = (plu) => {
+            _pendingPhotoOfferId = plu;
+            document.getElementById('offer-photo-file-input').click();
+        };
+
+        window.handleOfferPhotoUpload = (e) => {
+            const file = e.target.files[0]; if(!file || !_pendingPhotoOfferId) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const plu = _pendingPhotoOfferId;
+                if(!offerData[plu]) offerData[plu] = {};
+                offerData[plu].photo = ev.target.result;
+                saveOfferData();
+                renderOfferTable();
+                showToast("Photo updated.", "check_circle");
+                _pendingPhotoOfferId = null;
+            };
+            reader.readAsDataURL(file);
+            e.target.value = '';
+        };
+
+        // ===================== SINGLE ITEM ADD =====================
+        window.addSingleItem = () => {
+            const plu = document.getElementById('single-plu').value.trim();
+            const rawName = document.getElementById('single-name').value.trim();
+            const price = parseFloat(document.getElementById('single-price').value);
+            if(!plu || !rawName || isNaN(price)) { showToast("Please fill all fields (PLU, Name, Rate).", "error"); return; }
+            let baseUnit = 'KG';
+            const upName = rawName.toUpperCase();
+            if(upName.includes('BOX')) baseUnit = 'BOX';
+            if(upName.includes('PIECE') || upName.includes(' PC')) baseUnit = 'PC';
+            const isUpdate = !!appData[plu];
+            appData[plu] = { plu, rawName, displayName: cleanItemName(rawName), masterPrice: price, currentPrice: price, conversion: 1, unitText: baseUnit };
+            saveData(); updateMasterStatus(); renderTable();
+            document.getElementById('single-plu').value = '';
+            document.getElementById('single-name').value = '';
+            document.getElementById('single-price').value = '';
+            showToast(isUpdate ? `Item ${plu} updated.` : `Item ${plu} added successfully.`, "check_circle");
+        };
+
+        // ===================== MASTER FILE UPLOAD =====================
+        window.handleMasterUpload = (e) => {
+            const file = e.target.files[0]; if(!file) return;
+            Papa.parse(file, {
+                header: true, skipEmptyLines: true,
+                complete: function(results) {
+                    let newCount = 0, updateCount = 0;
+                    results.data.forEach(row => {
+                        const plu = row['PLU No'] ? row['PLU No'].trim() : null;
+                        const basePriceStr = row['Unit Price'] || row['Unit Price '] || '0';
+                        const basePrice = parseFloat(basePriceStr.replace(/,/g, ''));
+                        if(plu) {
+                            if(!appData[plu]) {
+                                let baseUnit = 'KG';
+                                const upName = (row['Item Name'] || '').toUpperCase();
+                                if(upName.includes('BOX')) baseUnit = 'BOX';
+                                if(upName.includes('PIECE') || upName.includes(' PC')) baseUnit = 'PC';
+                                appData[plu] = { plu, rawName: row['Item Name'], displayName: cleanItemName(row['Item Name']), masterPrice: basePrice, currentPrice: basePrice, conversion: 1, unitText: baseUnit };
+                                newCount++;
+                            } else {
+                                if(appData[plu].masterPrice !== basePrice) { appData[plu].masterPrice = basePrice; updateCount++; }
+                            }
+                        }
+                    });
+                    saveData(); updateMasterStatus(); renderTable(); e.target.value = '';
+                    if(newCount > 0 || updateCount > 0) showToast(`Master list: ${newCount} new, ${updateCount} updated.`, "cloud_done");
+                    else showToast(`No new changes found.`, "done_all");
+                }
+            });
+        };
+
+        // ===================== DAILY PRICE UPLOAD (XLSX) =====================
+        window.handleDailyUpload = (e) => {
+            const file = e.target.files[0]; if(!file) return;
+            if(Object.keys(appData).length === 0) { showToast("Please upload a Master PLU file in Settings first!", "error"); e.target.value = ''; return; }
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                try {
+                    const wb = XLSX.read(ev.target.result, { type: 'array' });
+                    const ws = wb.Sheets[wb.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                    let headerIndex = -1;
+                    for(let i = 0; i < rows.length; i++) {
+                        if(rows[i][0] && rows[i][0].toString().trim() === 'PLU No') { headerIndex = i; break; }
+                    }
+                    if(headerIndex === -1) { showToast("Could not find 'PLU No' header row.", "error"); e.target.value = ''; return; }
+                    let changedCount = 0, checkedCount = 0;
+                    for(let i = headerIndex + 1; i < rows.length; i++) {
+                        const row = rows[i];
+                        const plu = row[0] ? row[0].toString().trim() : null;
+                        const price = row[3] ? parseFloat(row[3].toString().replace(/,/g, '')) : NaN;
+                        if(plu && !isNaN(price) && appData[plu]) {
+                            checkedCount++;
+                            if(appData[plu].currentPrice !== price) { appData[plu].currentPrice = price; changedCount++; }
+                        }
+                    }
+                    saveData(); renderTable();
+                    const now = new Date();
+                    const dateString = now.toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+                    localStorage.setItem('talker_last_updated', dateString);
+                    document.getElementById('daily-status-home').innerText = `Updated: ${dateString}`;
+                    e.target.value = '';
+                    if(changedCount > 0) showToast(`Daily: ${changedCount} items changed prices.`, "price_check");
+                    else showToast(`Checked ${checkedCount} items. No changes.`, "done_all");
+                } catch(err) { showToast("Failed to read XLSX file.", "error"); e.target.value = ''; }
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        // ===================== REGULAR TALKER DIALOG =====================
         const openGenerateDialog = () => {
-            if(Object.keys(appData).length === 0) {
-                showToast("No items available. Add items in Settings first.", "warning");
-                return;
-            }
+            if(Object.keys(appData).length === 0) { showToast("No items available. Add items in Settings first.", "warning"); return; }
             const body = document.getElementById('dialog-list-body'); body.innerHTML = '';
-            const items = Object.values(appData)
-                .filter(item => !item.inactive)
-                .sort((a,b) => a.displayName.localeCompare(b.displayName));
-            
+            const items = Object.values(appData).filter(item => !item.inactive).sort((a,b) => a.displayName.localeCompare(b.displayName));
             items.forEach(item => {
                 const calcPrice = item.currentPrice * item.conversion;
                 const finalLabel = `${formatPrice(calcPrice)}/${item.unitText}`;
@@ -870,12 +958,11 @@
                 `;
                 body.appendChild(div);
             });
-
             document.getElementById('check-all').checked = true;
             document.getElementById('generate-dialog').classList.remove('hidden');
         };
 
-        const closeGenerateDialog = () => { 
+        const closeGenerateDialog = () => {
             document.getElementById('generate-dialog').classList.add('hidden');
             document.getElementById('dialog-search').value = '';
         };
@@ -883,8 +970,7 @@
         const filterDialogItems = (query) => {
             const q = query.toLowerCase();
             document.querySelectorAll('#dialog-list-body .list-item').forEach(el => {
-                const title = el.querySelector('.list-item-title').innerText.toLowerCase();
-                el.style.display = title.includes(q) ? '' : 'none';
+                el.style.display = el.querySelector('.list-item-title').innerText.toLowerCase().includes(q) ? '' : 'none';
             });
         };
 
@@ -894,47 +980,31 @@
         };
 
         const generateAndPrintPDF = () => {
-            const checkboxes = document.querySelectorAll('.item-checkbox:checked');
-            const selectedPLUs = Array.from(checkboxes).map(cb => cb.value);
-
-            if(selectedPLUs.length === 0) {
-                showToast("Please select at least one item to generate talkers.", "warning");
-                return;
-            }
-
-            const printArea = document.getElementById('print-area'); printArea.innerHTML = ''; 
-
-            // Modified to exact 8-items per page
-            for (let i = 0; i < selectedPLUs.length; i += 8) {
+            const selectedPLUs = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => cb.value);
+            if(selectedPLUs.length === 0) { showToast("Please select at least one item.", "warning"); return; }
+            const printArea = document.getElementById('print-area'); printArea.innerHTML = '';
+            for(let i = 0; i < selectedPLUs.length; i += 8) {
                 const chunk = selectedPLUs.slice(i, i + 8);
                 const pageWrap = document.createElement('div'); pageWrap.className = 'print-page';
-
                 chunk.forEach(plu => {
                     const item = appData[plu];
                     const calcPrice = item.currentPrice * item.conversion;
                     const formattedPriceHTML = formatPriceHTML(calcPrice);
-                    
                     const labelDiv = document.createElement('div'); labelDiv.className = 'talker-label';
-
-                    // Name column always 65%
-                    const nameWidth = '65%';
-                    const maxPx = 566;
-
-                    // Word-fit: add words one by one until they'd overflow the name column
+                    const nameWidth = '65%'; const maxPx = 566;
                     const fitName = (() => {
                         const words = item.displayName.toUpperCase().split(' ');
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
                         ctx.font = '900 88px Calibri, sans-serif';
                         let result = '';
-                        for (const word of words) {
+                        for(const word of words) {
                             const test = result ? result + ' ' + word : word;
-                            if (ctx.measureText(test).width > maxPx) break;
+                            if(ctx.measureText(test).width > maxPx) break;
                             result = test;
                         }
                         return result || words[0].substring(0, 6);
                     })();
-
                     const unitIsGrams = /^\d+G$/.test(item.unitText);
                     const unitStyle = unitIsGrams ? ' style="font-size:25px !important;"' : '';
                     labelDiv.innerHTML = `
@@ -942,21 +1012,157 @@
                         <div class="talker-price-container">
                             <span class="talker-price">${formattedPriceHTML}</span><span class="talker-unit"${unitStyle}>/${item.unitText}</span>
                         </div>
+                        <div class="talker-plu">${item.plu}</div>
                     `;
                     pageWrap.appendChild(labelDiv);
                 });
-                
                 if(chunk.length < 8) {
-                    for(let j=0; j < (8 - chunk.length); j++){
+                    for(let j = 0; j < (8 - chunk.length); j++) {
                         const emptyBlock = document.createElement('div'); emptyBlock.className = 'talker-label';
                         emptyBlock.style.borderBottom = "none"; pageWrap.appendChild(emptyBlock);
                     }
                 }
                 printArea.appendChild(pageWrap);
             }
-
             closeGenerateDialog();
+            document.getElementById('page-orient').textContent = '@media print { @page { size: A4 portrait; margin: 0; } }';
             setTimeout(() => { window.print(); }, 300);
+        };
+
+        // ===================== OFFER PRINT DIALOG =====================
+        const openOfferPrintDialog = () => {
+            const activeItems = Object.values(appData).filter(item => {
+                const meta = offerData[item.plu];
+                return meta && meta.offerActive;
+            });
+            if(activeItems.length === 0) { showToast("No active offer items. Go to Settings → Offer Items and toggle items on.", "warning"); return; }
+            const body = document.getElementById('offer-dialog-body'); body.innerHTML = '';
+            activeItems.sort((a,b) => a.displayName.localeCompare(b.displayName)).forEach(item => {
+                const meta = offerData[item.plu] || {};
+                const calcPrice = (item.currentPrice * item.conversion).toFixed(2);
+                const card = document.createElement('div'); card.className = 'offer-print-card'; card.dataset.plu = item.plu;
+                card.innerHTML = `
+                    ${meta.photo ? `<img src="${meta.photo}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : `<div style="width:56px;height:56px;border-radius:6px;background:var(--md-sys-color-surface-container);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-outlined" style="font-size:20px;color:var(--md-sys-color-on-surface-variant);">image</span></div>`}
+                    <div style="flex-grow:1; display:flex; flex-direction:column; gap:6px;">
+                        <input class="offer-edit-name" type="text" value="${item.displayName}" placeholder="Item name">
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <label style="font-size:12px;color:var(--md-sys-color-on-surface-variant);">Price ₹</label>
+                            <input class="offer-edit-price" type="number" value="${calcPrice}">
+                        </div>
+                    </div>
+                    <input type="checkbox" class="offer-print-check" checked style="width:20px;height:20px;flex-shrink:0;">
+                `;
+                body.appendChild(card);
+            });
+            document.getElementById('offer-dialog-search').value = '';
+            document.getElementById('offer-print-dialog').classList.remove('hidden');
+        };
+
+        const closeOfferPrintDialog = () => { document.getElementById('offer-print-dialog').classList.add('hidden'); };
+
+        const filterOfferDialogItems = (query) => {
+            const q = query.toLowerCase();
+            document.querySelectorAll('#offer-dialog-body .offer-print-card').forEach(el => {
+                const name = el.querySelector('.offer-edit-name').value.toLowerCase();
+                el.style.display = name.includes(q) ? '' : 'none';
+            });
+        };
+
+        const generateOfferPDF = () => {
+            const cards = Array.from(document.querySelectorAll('#offer-dialog-body .offer-print-card'));
+            const selected = cards.filter(c => c.querySelector('.offer-print-check').checked);
+            if(selected.length === 0) { showToast("Please select at least one offer item.", "warning"); return; }
+
+            const items = selected.map(card => {
+                const plu = card.dataset.plu;
+                const meta = offerData[plu] || {};
+                return {
+                    name: card.querySelector('.offer-edit-name').value.trim(),
+                    offerPrice: parseFloat(card.querySelector('.offer-edit-price').value),
+                    photo: meta.photo || null
+                };
+            });
+
+            const printArea = document.getElementById('print-area'); printArea.innerHTML = '';
+
+            for(let i = 0; i < items.length; i += 4) {
+                const chunk = items.slice(i, i + 4);
+
+                const pageWrap = document.createElement('div');
+                pageWrap.style.cssText = 'display:flex; flex-direction:row; flex-wrap:wrap; width:297mm; height:210mm; box-sizing:border-box; padding:5mm; gap:4mm; background:white; page-break-after:always;';
+
+                chunk.forEach(item => {
+                    const price = parseFloat(item.offerPrice);
+                    const [whole, dec] = price.toFixed(2).split('.');
+                    const showDec = dec && dec !== '00';
+
+                    const card = document.createElement('div');
+                    card.style.cssText = [
+                        'width:calc(50% - 2mm)', 'height:calc(50% - 2mm)',
+                        'box-sizing:border-box', 'display:flex', 'flex-direction:column',
+                        'background:#FFD700', 'border-radius:5mm', 'overflow:hidden',
+                        'padding:3mm 3mm 0 3mm',
+                        '-webkit-print-color-adjust:exact', 'print-color-adjust:exact', 'color-adjust:exact'
+                    ].join(';');
+
+                    // UPDATED SIZES: Name (33pt), Image (45mm), Main Price (76pt), Dec Price (28pt), Logo (15mm x 45mm)
+                    card.innerHTML = `
+                        <div style="flex-shrink:0; padding:0 1mm 2mm 1mm;">
+                            <span style="display:block;color:#d32f2f;font-weight:700;font-size:10pt;font-family:Arial,sans-serif;text-transform:uppercase;line-height:1.3;">EVERY DAY</span>
+                            <span style="display:block;color:#d32f2f;font-weight:900;font-size:17pt;font-family:Arial,sans-serif;text-transform:uppercase;line-height:1.1;">LOW PRICE</span>
+                        </div>
+                        <div style="flex-grow:1;background:white;border-radius:4mm 4mm 2mm 2mm;display:flex;flex-direction:column;padding:3mm 4mm 3mm 4mm;box-sizing:border-box;overflow:hidden;">
+                            <span style="display:block;font-size:33pt;font-weight:900;font-family:Arial,sans-serif;color:#111;text-transform:uppercase;line-height:1.1;margin-bottom:2mm;white-space:nowrap;overflow:hidden;">${item.name.toUpperCase()}</span>
+                            <div style="display:flex;flex-direction:row;align-items:flex-end;flex-grow:1;">
+                                ${item.photo
+                                    ? `<img src="${item.photo}" style="width:45mm;height:45mm;object-fit:cover;border-radius:2mm;flex-shrink:0;display:block;align-self:flex-end;">`
+                                    : `<div style="width:45mm;height:45mm;flex-shrink:0;background:#f0f0f0;border-radius:2mm;align-self:flex-end;"></div>`
+                                }
+                                <div style="flex-grow:1;display:flex;flex-direction:column;align-items:flex-end;justify-content:flex-end;gap:1.5mm;padding-bottom:1mm;">
+                                    <div style="display:flex;align-items:flex-start;line-height:0.9;">
+                                        <span style="color:#d32f2f;font-size:76pt;font-weight:900;font-family:Arial,sans-serif;line-height:0.9;white-space:nowrap;letter-spacing:-1px;">₹${whole}</span>${showDec ? `<span style="color:#d32f2f;font-size:28pt;font-weight:700;font-family:Arial,sans-serif;line-height:0.9;margin-top:10pt;">.${dec}</span>` : ''}
+                                    </div>
+                                    ${companyLogo ? `<img src="${companyLogo}" style="height:15mm;max-width:45mm;object-fit:contain;display:block;">` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="height:3mm;background:#8BC34A;flex-shrink:0;margin:1mm -3mm 0 -3mm;"></div>
+                    `;
+                    pageWrap.appendChild(card);
+                });
+
+                for(let j = chunk.length; j < 4; j++) {
+                    const empty = document.createElement('div');
+                    empty.style.cssText = 'width:calc(50% - 2mm);height:calc(50% - 2mm);box-sizing:border-box;';
+                    pageWrap.appendChild(empty);
+                }
+                printArea.appendChild(pageWrap);
+            }
+
+            // Swap to landscape before print, restore after
+            document.getElementById('page-orient').textContent = '@media print { @page { size: A4 landscape; margin: 0; } }';
+            closeOfferPrintDialog();
+            setTimeout(() => {
+                window.print();
+                setTimeout(() => {
+                    document.getElementById('page-orient').textContent = '@media print { @page { size: A4 portrait; margin: 0; } }';
+                }, 1000);
+            }, 300);
+        };
+
+        // ===================== DELETE DIALOG =====================
+        const openDeleteDialog = () => { document.getElementById('delete-dialog').classList.remove('hidden'); };
+        const closeDeleteDialog = () => { document.getElementById('delete-dialog').classList.add('hidden'); };
+        const confirmClearData = () => {
+            appData = {}; offerData = {}; companyLogo = null;
+            saveData(); saveOfferData();
+            localStorage.removeItem('talker_last_updated');
+            localStorage.removeItem('talker_logo');
+            document.getElementById('daily-status-home').innerText = 'No recent updates';
+            document.getElementById('logo-preview-wrap').style.display = 'none';
+            document.getElementById('remove-logo-btn').style.display = 'none';
+            updateMasterStatus(); renderTable(); renderOfferTable(); closeDeleteDialog();
+            showToast("All data cleared successfully.", "delete");
         };
     </script>
 </body>
