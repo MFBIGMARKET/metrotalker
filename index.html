@@ -16,10 +16,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
-    <!-- PapaParse for CSV -->
+    <!-- Data Parsers -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <!-- SheetJS for XLSX -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- FIREBASE SDKs (Compat version for simplicity) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
+
     <!-- Dynamic page orientation — swapped by JS before print -->
     <style id="page-orient">@media print { @page { size: A4 portrait; margin: 0; } }</style>
 
@@ -41,8 +46,6 @@
             --md-sys-color-inverse-surface: #313033;
             --md-sys-color-inverse-on-surface: #f4eff4;
             --red-print: #d93025;
-            --offer-yellow: #FFD700;
-            --offer-green: #4CAF50;
             --radius-sm: 8px;
             --radius-md: 16px;
             --radius-lg: 24px;
@@ -65,7 +68,7 @@
         .toggle-switch input:checked + .toggle-slider:before { transform: translateX(16px); }
 
         /* --- App Bar --- */
-        .app-bar { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; height: 64px; background-color: var(--md-sys-color-surface); position: sticky; top: 0; z-index: 10; }
+        .app-bar { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; height: 64px; background-color: var(--md-sys-color-surface); flex-shrink: 0; box-sizing: border-box; }
         .app-bar-title { font-size: 22px; color: var(--md-sys-color-on-surface); display: flex; align-items: center; gap: 12px; }
         .icon-btn { background: transparent; border: none; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--md-sys-color-on-surface-variant); transition: var(--transition); }
         .icon-btn:hover { background-color: var(--md-sys-color-surface-container-high); }
@@ -82,13 +85,13 @@
         .daily-status { font-size: 13px; color: var(--md-sys-color-on-surface-variant); background: rgba(0,0,0,0.05); padding: 6px 12px; border-radius: 100px; margin-top: 8px; }
 
         /* --- Settings View --- */
-        #settings-view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--md-sys-color-surface); z-index: 20; display: flex; flex-direction: column; }
-        .tabs-header { display: flex; justify-content: center; border-bottom: 1px solid var(--md-sys-color-surface-container-high); background: var(--md-sys-color-surface); overflow-x: auto; }
+        #settings-view { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--md-sys-color-surface); z-index: 20; display: flex; flex-direction: column; overflow: hidden; }
+        .tabs-header { display: flex; justify-content: center; border-bottom: 1px solid var(--md-sys-color-surface-container-high); background: var(--md-sys-color-surface); overflow-x: auto; flex-shrink: 0; box-sizing: border-box; }
         .tab-btn { background: none; border: none; padding: 16px 20px; font-size: 14px; font-weight: 500; color: var(--md-sys-color-on-surface-variant); cursor: pointer; position: relative; transition: var(--transition); white-space: nowrap; }
         .tab-btn.active { color: var(--md-sys-color-primary); }
         .tab-btn.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: var(--md-sys-color-primary); border-radius: 3px 3px 0 0; }
         .tab-btn:hover:not(.active) { background: var(--md-sys-color-surface-container); }
-        .tab-content { flex-grow: 1; padding: 32px 24px; max-width: 1100px; margin: 0 auto; width: 100%; overflow-y: auto; }
+        .tab-content { flex: 1; padding: 32px 24px; max-width: 1100px; margin: 0 auto; width: 100%; overflow-y: auto; box-sizing: border-box; }
 
         /* --- UI Elements --- */
         .card { background: var(--md-sys-color-surface); border: 1px solid var(--md-sys-color-surface-container-high); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px; }
@@ -139,8 +142,6 @@
         .offer-photo-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--md-sys-color-surface-container-high); }
         .offer-photo-placeholder { width: 48px; height: 48px; border-radius: 6px; border: 2px dashed var(--md-sys-color-surface-container-high); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--md-sys-color-on-surface-variant); }
         .offer-photo-placeholder:hover { background: var(--md-sys-color-surface-container); }
-
-        /* --- Logo Preview --- */
         .logo-preview { max-height: 60px; max-width: 200px; object-fit: contain; border-radius: 6px; }
 
         /* --- Offer Print Dialog --- */
@@ -153,225 +154,26 @@
         .offer-print-card .no-img { width: 56px; height: 56px; border-radius: 6px; background: var(--md-sys-color-surface-container); display: flex; align-items:center; justify-content: center; color: var(--md-sys-color-on-surface-variant); flex-shrink: 0; }
         .offer-edit-name { font-size: 15px; font-weight: 500; border: 1px solid var(--md-sys-color-surface-container-high); border-radius: 6px; padding: 4px 8px; width: 100%; background: var(--md-sys-color-surface-container); font-family: var(--font-family); }
         .offer-edit-price { font-size: 15px; border: 1px solid var(--md-sys-color-surface-container-high); border-radius: 6px; padding: 4px 8px; width: 90px; background: var(--md-sys-color-surface-container); font-family: var(--font-family); }
-        .offer-edit-mrp { font-size: 14px; border: 1px solid var(--md-sys-color-surface-container-high); border-radius: 6px; padding: 4px 8px; width: 90px; background: var(--md-sys-color-surface-container); font-family: var(--font-family); }
 
         /* --- Print Specific Styling --- */
         @media screen { #print-area { display: none !important; } }
-
         @media print {
             body * { display: none !important; }
             #print-area, #print-area * { display: flex !important; visibility: visible; }
             #print-area { display: block !important; position: absolute; top: 0; left: 0; width: 100%; background: white; }
 
-            /* === REGULAR TALKER PRINT === */
-            .print-page {
-                display: flex !important; flex-direction: column !important; width: 210mm; height: 297mm;
-                page-break-after: always; box-sizing: border-box; padding: 0; margin: 0;
-            }
-            .talker-label {
-                display: flex !important; flex-direction: row !important;
-                justify-content: flex-start !important; align-items: center !important;
-                height: calc(100% / 8) !important;
-                width: 100%; padding: 0 5mm 0 5mm !important;
-                box-sizing: border-box;
-                position: relative !important;
-                border-bottom: 2px dashed #aaa !important;
-            }
+            .print-page { display: flex !important; flex-direction: column !important; width: 210mm; height: 297mm; page-break-after: always; box-sizing: border-box; padding: 0; margin: 0; }
+            .talker-label { display: flex !important; flex-direction: row !important; justify-content: flex-start !important; align-items: center !important; height: calc(100% / 8) !important; width: 100%; padding: 0 5mm 0 5mm !important; box-sizing: border-box; position: relative !important; border-bottom: 2px dashed #aaa !important; }
             .talker-label:last-child { border-bottom: none !important; }
-            .talker-name {
-                display: block !important; width: 65% !important; flex-shrink: 0 !important; flex-grow: 0 !important;
-                padding-right: 4mm !important; box-sizing: border-box !important; color: var(--red-print) !important;
-                font-size: 88px !important; font-weight: 900 !important; -webkit-text-stroke: 1px var(--red-print) !important;
-                white-space: nowrap !important; overflow: hidden !important; text-align: left !important;
-                text-transform: uppercase !important; font-family: 'Calibri', sans-serif !important; line-height: 1 !important;
-            }
-            .talker-price-container {
-                flex-shrink: 0 !important; flex-grow: 0 !important; display: flex !important; flex-direction: row !important;
-                justify-content: flex-start !important; align-items: baseline !important; white-space: nowrap !important;
-            }
-            .talker-price {
-                color: #000 !important; font-size: 92px !important; font-weight: 900 !important;
-                font-family: 'Calibri', sans-serif !important; line-height: 1 !important;
-                display: inline-block !important; white-space: nowrap !important; vertical-align: baseline !important;
-            }
-            .talker-decimal {
-                font-size: 28px !important; font-weight: 700 !important; font-family: 'Calibri', sans-serif !important;
-                color: #000 !important; vertical-align: top !important; position: relative !important; top: 14px !important; line-height: 1 !important;
-            }
-            .talker-unit {
-                color: #000 !important; font-size: 44px !important; font-weight: 700 !important;
-                font-family: 'Calibri', sans-serif !important; line-height: 1 !important; white-space: nowrap !important;
-                display: inline-block !important; vertical-align: baseline !important; margin-bottom: 4px !important;
-            }
-            .talker-plu {
-                position: absolute !important; bottom: 3px !important; left: 50% !important;
-                transform: translateX(-50%) !important; font-size: 20px !important;
-                font-family: 'Calibri', sans-serif !important; color: #999 !important;
-                letter-spacing: 0.5px !important; white-space: nowrap !important;
-            }
-
-            /* === OFFER TALKER PRINT — A4 Landscape, 4-up === */
-            .offer-print-page {
-                display: flex !important;
-                flex-direction: row !important;
-                flex-wrap: wrap !important;
-                width: 297mm !important;
-                height: 210mm !important;
-                page-break-after: always !important;
-                box-sizing: border-box !important;
-                padding: 5mm !important;
-                gap: 4mm !important;
-                background: white !important;
-            }
-
-            /* Each quadrant — yellow outer card */
-            .offer-talker-card {
-                width: calc(50% - 2mm) !important;
-                height: calc(50% - 2mm) !important;
-                box-sizing: border-box !important;
-                display: flex !important;
-                flex-direction: column !important;
-                background: #FFD700 !important;
-                border-radius: 5mm !important;
-                overflow: hidden !important;
-                padding: 3mm 3mm 2mm 3mm !important;
-            }
-
-            /* Yellow top band: EVERY DAY + LOW PRICE */
-            .offer-top-band {
-                flex-shrink: 0 !important;
-                padding: 0 1mm 2mm 1mm !important;
-            }
-            .offer-top-text1 {
-                display: block !important;
-                color: #d32f2f !important;
-                font-weight: 700 !important;
-                font-size: 9pt !important;
-                font-family: Arial, sans-serif !important;
-                text-transform: uppercase !important;
-                line-height: 1.3 !important;
-            }
-            .offer-top-text2 {
-                display: block !important;
-                color: #d32f2f !important;
-                font-weight: 900 !important;
-                font-size: 14pt !important;
-                font-family: Arial, sans-serif !important;
-                text-transform: uppercase !important;
-                line-height: 1.1 !important;
-            }
-
-            .offer-content-area {
-    flex-grow: 1 !important;
-    background: white !important;
-    border-radius: 4mm 4mm 2mm 2mm !important;
-    display: flex !important;
-    flex-direction: column !important;
-
-    /* ADD THIS */
-    align-items: center !important;
-
-    padding: 2mm 3mm 2mm 3mm !important;
-    box-sizing: border-box !important;
-    overflow: hidden !important;
-    position: relative !important;
-}
-
-            .offer-item-name {
-    font-size: 16pt !important;
-    font-weight: 900 !important;
-    font-family: Arial, sans-serif !important;
-    color: #111 !important;
-    text-transform: uppercase !important;
-    line-height: 1.1 !important;
-    margin-bottom: 1mm !important;
-
-    text-align: center !important;
-    width: 100% !important;
-}
-
-            /* Row: photo left | price right */
-            .offer-body-row {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    align-items: end !important;
-}
-
-            .offer-product-img {
-                width: 30mm !important;
-                height: 30mm !important;
-                object-fit: cover !important;
-                border-radius: 2mm !important;
-                flex-shrink: 0 !important;
-                display: block !important;
-                align-self: flex-end !important;
-            }
-            .offer-no-img {
-                width: 30mm !important;
-                height: 30mm !important;
-                flex-shrink: 0 !important;
-                background: #f0f0f0 !important;
-                border-radius: 2mm !important;
-                display: block !important;
-                align-self: flex-end !important;
-            }
-
-            /* Price + logo stacked on right */
-            .offer-price-col {
-                flex-grow: 1 !important;
-                display: flex !important;
-                flex-direction: column !important;
-                align-items: flex-end !important;
-                justify-content: flex-end !important;
-                gap: 1mm !important;
-            }
-
-            /* Massive red price */
-            .offer-big-price {
-                display: flex !important;
-                align-items: flex-start !important;
-                color: #d32f2f !important;
-                font-size: 52pt !important;
-                font-weight: 900 !important;
-                font-family: Arial, sans-serif !important;
-                line-height: 1 !important;
-                white-space: nowrap !important;
-            }
-            .offer-big-price-dec {
-                font-size: 20pt !important;
-                font-weight: 700 !important;
-                color: #d32f2f !important;
-                font-family: Arial, sans-serif !important;
-                line-height: 1 !important;
-                margin-top: 5pt !important;
-            }
-
-            /* Logo bottom-right */
-            .offer-logo {
-                height: 8mm !important;
-                max-width: 28mm !important;
-                object-fit: contain !important;
-                display: block !important;
-                align-self: flex-end !important;
-            }
-            .offer-logo-placeholder { display: none !important; }
-
-            /* Green bottom strip on yellow card */
-            .offer-green-strip {
-                height: 3mm !important;
-                background: #8BC34A !important;
-                border-radius: 0 0 3mm 3mm !important;
-                flex-shrink: 0 !important;
-                margin: 1mm -3mm -2mm -3mm !important;
-            }
+            .talker-name { display: block !important; width: 65% !important; flex-shrink: 0 !important; flex-grow: 0 !important; padding-right: 4mm !important; box-sizing: border-box !important; color: var(--red-print) !important; font-size: 88px !important; font-weight: 900 !important; -webkit-text-stroke: 1px var(--red-print) !important; white-space: nowrap !important; overflow: hidden !important; text-align: left !important; text-transform: uppercase !important; font-family: 'Calibri', sans-serif !important; line-height: 1 !important; }
+            .talker-price-container { flex-shrink: 0 !important; flex-grow: 0 !important; display: flex !important; flex-direction: row !important; justify-content: flex-start !important; align-items: baseline !important; white-space: nowrap !important; }
+            .talker-price { color: #000 !important; font-size: 92px !important; font-weight: 900 !important; font-family: 'Calibri', sans-serif !important; line-height: 1 !important; display: inline-block !important; white-space: nowrap !important; vertical-align: baseline !important; }
+            .talker-decimal { font-size: 28px !important; font-weight: 700 !important; font-family: 'Calibri', sans-serif !important; color: #000 !important; vertical-align: top !important; position: relative !important; top: 14px !important; line-height: 1 !important; }
+            .talker-unit { color: #000 !important; font-size: 44px !important; font-weight: 700 !important; font-family: 'Calibri', sans-serif !important; line-height: 1 !important; white-space: nowrap !important; display: inline-block !important; vertical-align: baseline !important; margin-bottom: 4px !important; }
+            .talker-plu { position: absolute !important; bottom: 3px !important; left: 50% !important; transform: translateX(-50%) !important; font-size: 20px !important; font-family: 'Calibri', sans-serif !important; color: #999 !important; letter-spacing: 0.5px !important; white-space: nowrap !important; }
         }
-
-        /* Offer page needs landscape */
         @media print {
-            .offer-print-page ~ .print-page,
-            .print-page ~ .offer-print-page {
-                page-break-before: always;
-            }
+            .offer-print-page ~ .print-page, .print-page ~ .offer-print-page { page-break-before: always; }
         }
     </style>
 </head>
@@ -384,9 +186,15 @@
                 <span class="material-symbols-outlined" style="color: var(--md-sys-color-primary); font-variation-settings: 'FILL' 1;">sell</span>
                 Talker Generator
             </div>
-            <button class="icon-btn" onclick="openSettings()" title="Settings">
-                <span class="material-symbols-outlined">settings</span>
-            </button>
+            <div style="display:flex; align-items:center; gap: 16px;">
+                <select id="branch-selector" class="md-text-field" onchange="changeBranch()" style="height: 36px; padding: 0 12px; font-weight: 500; cursor: pointer;">
+                    <option value="iritty">📍 Iritty Branch</option>
+                    <option value="mattannur">📍 Mattannur Branch</option>
+                </select>
+                <button class="icon-btn" onclick="openSettings()" title="Settings">
+                    <span class="material-symbols-outlined">settings</span>
+                </button>
+            </div>
         </header>
 
         <main class="home-container">
@@ -426,7 +234,6 @@
             <button class="tab-btn" onclick="switchTab('tab-data')" id="btn-tab-data">Data & Upload</button>
         </div>
 
-        <!-- Tab 1: Master List -->
         <div class="tab-content" id="tab-list">
             <div class="table-wrap">
                 <table>
@@ -444,12 +251,11 @@
                 </table>
                 <div id="empty-state" style="padding: 48px; text-align: center; color: var(--md-sys-color-on-surface-variant); display: none;">
                     <span class="material-symbols-outlined" style="font-size: 48px; opacity: 0.5;">database</span>
-                    <p style="margin-top: 16px;">No master data loaded. Go to the Data & Upload tab to start.</p>
+                    <p style="margin-top: 16px;">No master data loaded for this branch.</p>
                 </div>
             </div>
         </div>
 
-        <!-- Tab 2: Offer Items -->
         <div class="tab-content hidden" id="tab-offer">
             <p style="font-size: 13px; color: var(--md-sys-color-on-surface-variant); margin-bottom: 16px;">All items are from the master list. Upload a product photo and mark items active to include them in offer prints. Name and price can be edited at print time.</p>
             <div class="table-wrap">
@@ -467,12 +273,11 @@
                 </table>
                 <div id="offer-empty-state" style="padding: 48px; text-align: center; color: var(--md-sys-color-on-surface-variant); display: none;">
                     <span class="material-symbols-outlined" style="font-size: 48px; opacity: 0.5;">database</span>
-                    <p style="margin-top: 16px;">No master data loaded. Go to the Data &amp; Upload tab to start.</p>
+                    <p style="margin-top: 16px;">No master data loaded for this branch.</p>
                 </div>
             </div>
         </div>
 
-        <!-- Tab 3: Data Management -->
         <div class="tab-content hidden" id="tab-data">
             <div class="card" style="display: flex; align-items: center; justify-content: space-between;">
                 <div>
@@ -518,21 +323,19 @@
             <div class="card" style="border-color: var(--md-sys-color-error-container); display: flex; align-items: center; justify-content: space-between;">
                 <div>
                     <h3 style="color: var(--md-sys-color-error); font-size: 16px; font-weight: 500;">Danger Zone</h3>
-                    <p style="color: var(--md-sys-color-on-surface-variant); font-size: 14px; margin-top: 4px;">Wipe all stored configurations and history.</p>
+                    <p style="color: var(--md-sys-color-on-surface-variant); font-size: 14px; margin-top: 4px;">Wipe all stored items for this branch.</p>
                 </div>
                 <button class="btn-error-tonal" onclick="openDeleteDialog()">
-                    <span class="material-symbols-outlined" style="font-size: 20px;">delete</span> Clear All
+                    <span class="material-symbols-outlined" style="font-size: 20px;">delete</span> Clear Branch Data
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- GENERATE DIALOG (regular talkers) -->
+    <!-- DIALOGS -->
     <div class="dialog-scrim hidden" id="generate-dialog">
         <div class="dialog-container">
-            <div class="dialog-header">
-                <h2>Select Items to Print</h2>
-            </div>
+            <div class="dialog-header"><h2>Select Items to Print</h2></div>
             <div style="padding: 12px 24px; border-bottom: 1px solid var(--md-sys-color-surface-container-high);">
                 <input type="text" id="dialog-search" placeholder="Search items..." class="md-text-field" style="width:100%; height:40px;" oninput="filterDialogItems(this.value)">
             </div>
@@ -543,14 +346,11 @@
             <div class="dialog-content" id="dialog-list-body"></div>
             <div class="dialog-actions">
                 <button class="btn-tonal" style="background: transparent;" onclick="closeGenerateDialog()">Cancel</button>
-                <button class="btn-filled" onclick="generateAndPrintPDF()">
-                    <span class="material-symbols-outlined">picture_as_pdf</span> Print
-                </button>
+                <button class="btn-filled" onclick="generateAndPrintPDF()"><span class="material-symbols-outlined">picture_as_pdf</span> Print</button>
             </div>
         </div>
     </div>
 
-    <!-- OFFER PRINT DIALOG -->
     <div class="dialog-scrim hidden" id="offer-print-dialog">
         <div class="dialog-container" style="max-width: 680px;">
             <div class="dialog-header">
@@ -563,21 +363,16 @@
             <div class="dialog-content" id="offer-dialog-body" style="padding: 16px 24px;"></div>
             <div class="dialog-actions">
                 <button class="btn-tonal" style="background: transparent;" onclick="closeOfferPrintDialog()">Cancel</button>
-                <button class="btn-orange" onclick="generateOfferPDF()">
-                    <span class="material-symbols-outlined">picture_as_pdf</span> Print Offers
-                </button>
+                <button class="btn-orange" onclick="generateOfferPDF()"><span class="material-symbols-outlined">picture_as_pdf</span> Print Offers</button>
             </div>
         </div>
     </div>
 
-    <!-- DELETE CONFIRM DIALOG -->
     <div class="dialog-scrim hidden" id="delete-dialog">
         <div class="dialog-container" style="max-width: 400px; max-height: unset;">
-            <div class="dialog-header" style="padding-bottom: 8px;">
-                <h2 style="color: var(--md-sys-color-on-surface);">Clear All Data?</h2>
-            </div>
+            <div class="dialog-header" style="padding-bottom: 8px;"><h2 style="color: var(--md-sys-color-on-surface);">Clear Branch Data?</h2></div>
             <div class="dialog-content" style="padding: 0 24px 24px; color: var(--md-sys-color-on-surface-variant); line-height: 1.5;">
-                This will permanently delete all stored master items, custom names, conversion ratios, offer items and logo. This action cannot be undone.
+                This will permanently delete all stored master items, custom names, conversion ratios, and offer items for <strong id="delete-branch-name">this branch</strong> from the cloud database.
             </div>
             <div class="dialog-actions">
                 <button class="btn-tonal" style="background: transparent;" onclick="closeDeleteDialog()">Cancel</button>
@@ -586,60 +381,102 @@
         </div>
     </div>
 
-    <!-- SNACKBAR NOTIFICATION -->
-    <div id="snackbar">
-        <span class="material-symbols-outlined" id="snackbar-icon" style="font-size: 20px;">info</span>
-        <span id="snackbar-text">Message</span>
-    </div>
-
-    <!-- HIDDEN PRINT AREA -->
+    <div id="snackbar"><span class="material-symbols-outlined" id="snackbar-icon" style="font-size: 20px;">info</span><span id="snackbar-text">Message</span></div>
     <div id="print-area"></div>
-    <!-- Hidden file inputs for offer photos -->
     <input type="file" id="offer-photo-file-input" accept="image/*" class="hidden" onchange="handleOfferPhotoUpload(event)">
 
     <script>
+        // =====================================================================
+        // 1. FIREBASE CONFIGURATION (REPLACE WITH YOUR KEYS)
+        // =====================================================================
+        const firebaseConfig = {
+  apiKey: "AIzaSyDS0jwh9Orfz3-0A-gXm13rSuo_Jftw6IQ",
+  authDomain: "metro-talkers.firebaseapp.com",
+  projectId: "metro-talkers",
+  storageBucket: "metro-talkers.firebasestorage.app",
+  messagingSenderId: "1044121126387",
+  appId: "1:1044121126387:web:fca688fbe5807bf8817e86"
+};
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        // =====================================================================
+        // 2. STATE & VARIABLES
+        // =====================================================================
+        let currentBranch = "iritty"; 
         let appData = {};
-        let offerData = {};   // { id: { id, plu, name, offerPrice, mrp, photo(base64), inactive } }
-        let companyLogo = null; // base64
+        let offerData = {};
+        let companyLogo = null;
         let _pendingPhotoOfferId = null;
 
-        // PWA Service Worker
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(() => {});
-            });
-        }
-
-        // ===================== INIT =====================
-        window.onload = () => {
-            const savedData = localStorage.getItem('talker_appData_v2');
-            if(savedData) {
-                try {
-                    appData = JSON.parse(savedData);
-                    let migrated = false;
-                    Object.values(appData).forEach(item => {
-                        if(item.unitText === '½KG') { item.unitText = '500G'; migrated = true; }
-                        else if(item.unitText === '¼KG') { item.unitText = '250G'; migrated = true; }
-                    });
-                    if(migrated) saveData();
-                    updateMasterStatus();
-                    renderTable();
-                } catch(e) { console.error("Could not parse local data"); }
+        window.onload = async () => {
+            const savedBranch = localStorage.getItem('selected_branch');
+            if(savedBranch) {
+                currentBranch = savedBranch;
+                document.getElementById('branch-selector').value = currentBranch;
             }
-
-            const savedOffer = localStorage.getItem('talker_offerData_v1');
-            if(savedOffer) { try { offerData = JSON.parse(savedOffer); } catch(e) {} }
-
-            const savedLogo = localStorage.getItem('talker_logo');
-            if(savedLogo) { companyLogo = savedLogo; showLogoPreview(savedLogo); }
-
-            const lastUpdated = localStorage.getItem('talker_last_updated');
-            if(lastUpdated) document.getElementById('daily-status-home').innerText = `Updated: ${lastUpdated}`;
-
+            await loadDataFromFirebase();
             switchTab('tab-list');
         };
 
-        // ===================== UTILITIES =====================
+        // =====================================================================
+        // 3. FIREBASE HELPER FUNCTIONS
+        // =====================================================================
+        const commitInChunks = async (dataObj, collectionName) => {
+            const keys = Object.keys(dataObj);
+            const ref = db.collection("branches").doc(currentBranch).collection(collectionName);
+            for(let i=0; i<keys.length; i+=450) {
+                const chunk = keys.slice(i, i+450);
+                const batch = db.batch();
+                chunk.forEach(k => batch.set(ref.doc(k), dataObj[k]));
+                await batch.commit();
+            }
+        };
+
+        const loadDataFromFirebase = async () => {
+            showToast("Loading branch data...", "sync");
+            appData = {}; offerData = {}; companyLogo = null;
+            document.getElementById('logo-preview-wrap').style.display = 'none';
+            document.getElementById('daily-status-home').innerText = `No recent updates`;
+
+            try {
+                const itemsSnap = await db.collection("branches").doc(currentBranch).collection("items").get();
+                itemsSnap.forEach(doc => { appData[doc.id] = doc.data(); });
+
+                const offersSnap = await db.collection("branches").doc(currentBranch).collection("offers").get();
+                offersSnap.forEach(doc => { offerData[doc.id] = doc.data(); });
+
+                const settingsDoc = await db.collection("branches").doc(currentBranch).collection("settings").doc("meta").get();
+                if(settingsDoc.exists) {
+                    const meta = settingsDoc.data();
+                    companyLogo = meta.logo || null;
+                    if(companyLogo) showLogoPreview(companyLogo);
+                    if(meta.lastUpdated) document.getElementById('daily-status-home').innerText = `Updated: ${meta.lastUpdated}`;
+                }
+
+                updateMasterStatus(); renderTable();
+                if(!document.getElementById('tab-offer').classList.contains('hidden')) renderOfferTable();
+                showToast(`Loaded ${currentBranch.toUpperCase()}`, "check_circle");
+            } catch(e) {
+                console.error(e);
+                showToast("Failed to load database. Check Firebase Rules.", "error");
+            }
+        };
+
+        window.saveData = async () => await commitInChunks(appData, "items");
+        window.saveOfferData = async () => await commitInChunks(offerData, "offers");
+
+        window.changeBranch = async () => {
+            currentBranch = document.getElementById('branch-selector').value;
+            localStorage.setItem('selected_branch', currentBranch);
+            await loadDataFromFirebase();
+        };
+
+        // =====================================================================
+        // 4. UTILITIES
+        // =====================================================================
         let snackbarTimeout;
         const showToast = (message, icon = 'info') => {
             const snackbar = document.getElementById("snackbar");
@@ -649,235 +486,37 @@
             clearTimeout(snackbarTimeout);
             snackbarTimeout = setTimeout(() => { snackbar.className = snackbar.className.replace("show", ""); }, 4000);
         };
-
-        const formatPrice = (val) => {
-            const num = parseFloat(val);
-            if(isNaN(num)) return val;
-            return '₹' + Number.parseFloat(num.toFixed(2)).toString();
-        };
-
+        const formatPrice = (val) => { const num = parseFloat(val); return isNaN(num) ? val : '₹' + Number.parseFloat(num.toFixed(2)).toString(); };
         const formatPriceHTML = (val) => {
-            const num = parseFloat(val);
-            if(isNaN(num)) return `₹${Math.round(num)}`;
-            const fixed = num.toFixed(2);
-            const [whole, dec] = fixed.split('.');
-            if(dec && dec !== '00') return `₹${whole}<sup class="talker-decimal">.${dec}</sup>`;
-            return `₹${whole}`;
+            const num = parseFloat(val); if(isNaN(num)) return `₹${Math.round(num)}`;
+            const fixed = num.toFixed(2); const [whole, dec] = fixed.split('.');
+            if(dec && dec !== '00') return `₹${whole}<sup class="talker-decimal">.${dec}</sup>`; return `₹${whole}`;
         };
+        const cleanItemName = (rawName) => rawName.replace(/\(\d+\)/g, '').replace(/\b(?:KG|MP|KA|SPL|PREMIUM|FRESH|OFFR|OFFER|NADAN|BOX|PIECE|PC)\b/gi, '').replace(/\s{2,}/g, ' ').trim();
 
-        const cleanItemName = (rawName) => {
-            return rawName.replace(/\(\d+\)/g, '')
-                .replace(/\b(?:KG|MP|KA|SPL|PREMIUM|FRESH|OFFR|OFFER|NADAN|BOX|PIECE|PC)\b/gi, '')
-                .replace(/\s{2,}/g, ' ').trim();
-        };
-
-        const saveData = () => localStorage.setItem('talker_appData_v2', JSON.stringify(appData));
-        const saveOfferData = () => localStorage.setItem('talker_offerData_v1', JSON.stringify(offerData));
-
-        // ===================== TABS & NAVIGATION =====================
-        const openSettings = () => {
-            document.getElementById('home-view').classList.add('hidden');
-            document.getElementById('settings-view').classList.remove('hidden');
-            renderTable();
-        };
-        const closeSettings = () => {
-            document.getElementById('settings-view').classList.add('hidden');
-            document.getElementById('home-view').classList.remove('hidden');
-        };
-
+        const openSettings = () => { document.getElementById('home-view').classList.add('hidden'); document.getElementById('settings-view').classList.remove('hidden'); renderTable(); };
+        const closeSettings = () => { document.getElementById('settings-view').classList.add('hidden'); document.getElementById('home-view').classList.remove('hidden'); };
         const switchTab = (tabId) => {
-            ['tab-list','tab-offer','tab-data'].forEach(id => {
-                document.getElementById(id).classList.add('hidden');
-                document.getElementById('btn-' + id).classList.remove('active');
-            });
-            document.getElementById(tabId).classList.remove('hidden');
-            document.getElementById('btn-' + tabId).classList.add('active');
+            ['tab-list','tab-offer','tab-data'].forEach(id => { document.getElementById(id).classList.add('hidden'); document.getElementById('btn-' + id).classList.remove('active'); });
+            document.getElementById(tabId).classList.remove('hidden'); document.getElementById('btn-' + tabId).classList.add('active');
             if(tabId === 'tab-offer') renderOfferTable();
         };
-
         const updateMasterStatus = () => {
             const count = Object.keys(appData).length;
             const statusEl = document.getElementById('master-status-text');
-            if(count > 0) {
-                statusEl.innerText = `${count} items currently loaded in memory.`;
-                statusEl.style.color = 'var(--md-sys-color-primary)';
-            } else {
-                statusEl.innerText = `Upload your base system export here.`;
-                statusEl.style.color = 'var(--md-sys-color-on-surface-variant)';
-            }
+            if(count > 0) { statusEl.innerText = `${count} items loaded in ${currentBranch.toUpperCase()}.`; statusEl.style.color = 'var(--md-sys-color-primary)'; } 
+            else { statusEl.innerText = `Upload your base system export here.`; statusEl.style.color = 'var(--md-sys-color-on-surface-variant)'; }
         };
 
-        // ===================== LOGO =====================
-        const handleLogoUpload = (e) => {
-            const file = e.target.files[0]; if(!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                companyLogo = ev.target.result;
-                localStorage.setItem('talker_logo', companyLogo);
-                showLogoPreview(companyLogo);
-                showToast("Logo uploaded successfully.", "check_circle");
-            };
-            reader.readAsDataURL(file);
-            e.target.value = '';
-        };
-        const showLogoPreview = (src) => {
-            document.getElementById('logo-preview-img').src = src;
-            document.getElementById('logo-preview-wrap').style.display = 'block';
-            document.getElementById('remove-logo-btn').style.display = 'inline-flex';
-        };
-        const removeLogo = () => {
-            companyLogo = null;
-            localStorage.removeItem('talker_logo');
-            document.getElementById('logo-preview-wrap').style.display = 'none';
-            document.getElementById('remove-logo-btn').style.display = 'none';
-            showToast("Logo removed.", "delete");
-        };
-
-        // ===================== MASTER TABLE =====================
-        const renderTable = () => {
-            const items = Object.values(appData);
-            const tbody = document.getElementById('items-tbody');
-            const emptyState = document.getElementById('empty-state');
-            if(items.length === 0) { tbody.innerHTML = ''; emptyState.style.display = 'block'; return; }
-            emptyState.style.display = 'none'; tbody.innerHTML = '';
-            items.sort((a,b) => a.displayName.localeCompare(b.displayName)).forEach(item => {
-                const tr = document.createElement('tr');
-                const calcPrice = item.currentPrice * item.conversion;
-                const finalLabel = `${formatPrice(calcPrice)}/${item.unitText}`;
-                const isInactive = !!item.inactive;
-                if(isInactive) tr.style.opacity = '0.4';
-                tr.innerHTML = `
-                    <td style="color:var(--md-sys-color-on-surface-variant);">${item.plu}</td>
-                    <td><div class="editable-cell" contenteditable="true" onblur="updateName('${item.plu}', this.innerText)">${item.displayName}</div></td>
-                    <td>${formatPrice(item.currentPrice)}</td>
-                    <td><input type="number" class="md-input-small" step="0.05" min="0.05" value="${item.conversion}" oninput="updateConversion('${item.plu}', this.value)"></td>
-                    <td style="font-weight: 500;" id="res-${item.plu}">${finalLabel}</td>
-                    <td style="text-align:center;">
-                        <label class="toggle-switch">
-                            <input type="checkbox" ${isInactive ? '' : 'checked'} onchange="toggleActive('${item.plu}', this.checked)">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        };
-
-        window.updateName = (plu, newName) => {
-            if(appData[plu]) { appData[plu].displayName = newName.trim() || appData[plu].rawName; saveData(); }
-        };
-
-        window.updateConversion = (plu, val) => {
-            if(appData[plu]) {
-                const numVal = parseFloat(val) || 1;
-                appData[plu].conversion = numVal;
-                if(numVal > 0 && numVal < 1) {
-                    appData[plu].unitText = `${Math.round(numVal * 1000)}G`;
-                } else {
-                    let baseUnit = 'KG';
-                    const upName = appData[plu].rawName.toUpperCase();
-                    if(upName.includes('BOX')) baseUnit = 'BOX';
-                    if(upName.includes('PIECE') || upName.includes(' PC')) baseUnit = 'PC';
-                    appData[plu].unitText = baseUnit;
-                }
-                const calcPrice = appData[plu].currentPrice * appData[plu].conversion;
-                document.getElementById(`res-${plu}`).innerText = `${formatPrice(calcPrice)}/${appData[plu].unitText}`;
-                saveData();
-            }
-        };
-
-        window.toggleActive = (plu, isActive) => {
-            if(appData[plu]) { appData[plu].inactive = !isActive; saveData(); renderTable(); }
-        };
-
-        // ===================== OFFER TABLE =====================
-        // offerData keyed by PLU: { photo, offerActive }
-        // Name & price always come from appData
-
-        const renderOfferTable = () => {
-            const items = Object.values(appData);
-            const tbody = document.getElementById('offer-tbody');
-            const emptyState = document.getElementById('offer-empty-state');
-            if(items.length === 0) { tbody.innerHTML = ''; emptyState.style.display = 'block'; return; }
-            emptyState.style.display = 'none'; tbody.innerHTML = '';
-            items.sort((a,b) => a.displayName.localeCompare(b.displayName)).forEach(item => {
-                const offerMeta = offerData[item.plu] || {};
-                const isOfferActive = !!offerMeta.offerActive;
-                const calcPrice = item.currentPrice * item.conversion;
-                const tr = document.createElement('tr');
-                if(!isOfferActive) tr.style.opacity = '0.45';
-                const photoCell = offerMeta.photo
-                    ? `<img src="${offerMeta.photo}" class="offer-photo-thumb" alt="" onclick="triggerOfferPhoto('${item.plu}')" style="cursor:pointer;" title="Click to change">`
-                    : `<div class="offer-photo-placeholder" onclick="triggerOfferPhoto('${item.plu}')" title="Upload photo"><span class="material-symbols-outlined" style="font-size:20px;">add_photo_alternate</span></div>`;
-                tr.innerHTML = `
-                    <td>${photoCell}</td>
-                    <td style="color:var(--md-sys-color-on-surface-variant);">${item.plu}</td>
-                    <td>${item.displayName}</td>
-                    <td>${formatPrice(calcPrice)}/${item.unitText}</td>
-                    <td style="text-align:center;">
-                        <label class="toggle-switch">
-                            <input type="checkbox" ${isOfferActive ? 'checked' : ''} onchange="toggleOfferActive('${item.plu}', this.checked)">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        };
-
-        window.toggleOfferActive = (plu, isActive) => {
-            if(!offerData[plu]) offerData[plu] = {};
-            offerData[plu].offerActive = isActive;
-            saveOfferData();
-            renderOfferTable();
-        };
-
-        window.triggerOfferPhoto = (plu) => {
-            _pendingPhotoOfferId = plu;
-            document.getElementById('offer-photo-file-input').click();
-        };
-
-        window.handleOfferPhotoUpload = (e) => {
-            const file = e.target.files[0]; if(!file || !_pendingPhotoOfferId) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const plu = _pendingPhotoOfferId;
-                if(!offerData[plu]) offerData[plu] = {};
-                offerData[plu].photo = ev.target.result;
-                saveOfferData();
-                renderOfferTable();
-                showToast("Photo updated.", "check_circle");
-                _pendingPhotoOfferId = null;
-            };
-            reader.readAsDataURL(file);
-            e.target.value = '';
-        };
-
-        // ===================== SINGLE ITEM ADD =====================
-        window.addSingleItem = () => {
-            const plu = document.getElementById('single-plu').value.trim();
-            const rawName = document.getElementById('single-name').value.trim();
-            const price = parseFloat(document.getElementById('single-price').value);
-            if(!plu || !rawName || isNaN(price)) { showToast("Please fill all fields (PLU, Name, Rate).", "error"); return; }
-            let baseUnit = 'KG';
-            const upName = rawName.toUpperCase();
-            if(upName.includes('BOX')) baseUnit = 'BOX';
-            if(upName.includes('PIECE') || upName.includes(' PC')) baseUnit = 'PC';
-            const isUpdate = !!appData[plu];
-            appData[plu] = { plu, rawName, displayName: cleanItemName(rawName), masterPrice: price, currentPrice: price, conversion: 1, unitText: baseUnit };
-            saveData(); updateMasterStatus(); renderTable();
-            document.getElementById('single-plu').value = '';
-            document.getElementById('single-name').value = '';
-            document.getElementById('single-price').value = '';
-            showToast(isUpdate ? `Item ${plu} updated.` : `Item ${plu} added successfully.`, "check_circle");
-        };
-
-        // ===================== MASTER FILE UPLOAD =====================
+        // =====================================================================
+        // 5. UPLOADS (CSV, XLSX, PHOTOS, LOGO)
+        // =====================================================================
         window.handleMasterUpload = (e) => {
             const file = e.target.files[0]; if(!file) return;
+            showToast("Processing CSV...", "sync");
             Papa.parse(file, {
                 header: true, skipEmptyLines: true,
-                complete: function(results) {
+                complete: async function(results) {
                     let newCount = 0, updateCount = 0;
                     results.data.forEach(row => {
                         const plu = row['PLU No'] ? row['PLU No'].trim() : null;
@@ -885,10 +524,8 @@
                         const basePrice = parseFloat(basePriceStr.replace(/,/g, ''));
                         if(plu) {
                             if(!appData[plu]) {
-                                let baseUnit = 'KG';
-                                const upName = (row['Item Name'] || '').toUpperCase();
-                                if(upName.includes('BOX')) baseUnit = 'BOX';
-                                if(upName.includes('PIECE') || upName.includes(' PC')) baseUnit = 'PC';
+                                let baseUnit = 'KG'; const upName = (row['Item Name'] || '').toUpperCase();
+                                if(upName.includes('BOX')) baseUnit = 'BOX'; if(upName.includes('PIECE') || upName.includes(' PC')) baseUnit = 'PC';
                                 appData[plu] = { plu, rawName: row['Item Name'], displayName: cleanItemName(row['Item Name']), masterPrice: basePrice, currentPrice: basePrice, conversion: 1, unitText: baseUnit };
                                 newCount++;
                             } else {
@@ -896,42 +533,40 @@
                             }
                         }
                     });
-                    saveData(); updateMasterStatus(); renderTable(); e.target.value = '';
+                    showToast("Syncing to Cloud...", "cloud_upload");
+                    await saveData(); updateMasterStatus(); renderTable(); e.target.value = '';
                     if(newCount > 0 || updateCount > 0) showToast(`Master list: ${newCount} new, ${updateCount} updated.`, "cloud_done");
                     else showToast(`No new changes found.`, "done_all");
                 }
             });
         };
 
-        // ===================== DAILY PRICE UPLOAD (XLSX) =====================
         window.handleDailyUpload = (e) => {
             const file = e.target.files[0]; if(!file) return;
-            if(Object.keys(appData).length === 0) { showToast("Please upload a Master PLU file in Settings first!", "error"); e.target.value = ''; return; }
+            if(Object.keys(appData).length === 0) { showToast("Upload Master PLU file first!", "error"); e.target.value = ''; return; }
+            showToast("Processing XLSX...", "sync");
             const reader = new FileReader();
-            reader.onload = function(ev) {
+            reader.onload = async function(ev) {
                 try {
                     const wb = XLSX.read(ev.target.result, { type: 'array' });
                     const ws = wb.Sheets[wb.SheetNames[0]];
                     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
                     let headerIndex = -1;
-                    for(let i = 0; i < rows.length; i++) {
-                        if(rows[i][0] && rows[i][0].toString().trim() === 'PLU No') { headerIndex = i; break; }
-                    }
-                    if(headerIndex === -1) { showToast("Could not find 'PLU No' header row.", "error"); e.target.value = ''; return; }
+                    for(let i = 0; i < rows.length; i++) { if(rows[i][0] && rows[i][0].toString().trim() === 'PLU No') { headerIndex = i; break; } }
+                    if(headerIndex === -1) { showToast("Could not find 'PLU No' header.", "error"); e.target.value = ''; return; }
                     let changedCount = 0, checkedCount = 0;
                     for(let i = headerIndex + 1; i < rows.length; i++) {
-                        const row = rows[i];
-                        const plu = row[0] ? row[0].toString().trim() : null;
+                        const row = rows[i]; const plu = row[0] ? row[0].toString().trim() : null;
                         const price = row[3] ? parseFloat(row[3].toString().replace(/,/g, '')) : NaN;
                         if(plu && !isNaN(price) && appData[plu]) {
                             checkedCount++;
                             if(appData[plu].currentPrice !== price) { appData[plu].currentPrice = price; changedCount++; }
                         }
                     }
-                    saveData(); renderTable();
-                    const now = new Date();
-                    const dateString = now.toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
-                    localStorage.setItem('talker_last_updated', dateString);
+                    showToast("Syncing Daily Prices...", "cloud_upload");
+                    await saveData(); renderTable();
+                    const dateString = new Date().toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+                    await db.collection("branches").doc(currentBranch).collection("settings").doc("meta").set({ lastUpdated: dateString }, { merge: true });
                     document.getElementById('daily-status-home').innerText = `Updated: ${dateString}`;
                     e.target.value = '';
                     if(changedCount > 0) showToast(`Daily: ${changedCount} items changed prices.`, "price_check");
@@ -941,191 +576,188 @@
             reader.readAsArrayBuffer(file);
         };
 
-        // ===================== REGULAR TALKER DIALOG =====================
-        const openGenerateDialog = () => {
-            if(Object.keys(appData).length === 0) { showToast("No items available. Add items in Settings first.", "warning"); return; }
-            const body = document.getElementById('dialog-list-body'); body.innerHTML = '';
-            const items = Object.values(appData).filter(item => !item.inactive).sort((a,b) => a.displayName.localeCompare(b.displayName));
-            items.forEach(item => {
-                const calcPrice = item.currentPrice * item.conversion;
-                const finalLabel = `${formatPrice(calcPrice)}/${item.unitText}`;
-                const div = document.createElement('label'); div.className = 'list-item';
-                div.innerHTML = `
-                    <input type="checkbox" class="item-checkbox" value="${item.plu}" checked>
-                    <div class="list-item-text">
-                        <div class="list-item-title">${item.displayName}</div>
-                        <div class="list-item-subtitle">Base: ${formatPrice(item.currentPrice)} &bull; Output: <strong>${finalLabel}</strong></div>
-                    </div>
+        window.handleLogoUpload = async (e) => {
+            const file = e.target.files[0]; if(!file) return;
+            showToast("Uploading Logo...", "cloud_upload");
+            const logoRef = storage.ref().child(`branches/${currentBranch}/settings/logo_${Date.now()}`);
+            try {
+                await logoRef.put(file);
+                companyLogo = await logoRef.getDownloadURL();
+                await db.collection("branches").doc(currentBranch).collection("settings").doc("meta").set({ logo: companyLogo }, { merge: true });
+                showLogoPreview(companyLogo);
+                showToast("Logo uploaded successfully.", "check_circle");
+            } catch (error) { showToast("Logo upload failed.", "error"); }
+            e.target.value = '';
+        };
+        const showLogoPreview = (src) => { document.getElementById('logo-preview-img').src = src; document.getElementById('logo-preview-wrap').style.display = 'block'; document.getElementById('remove-logo-btn').style.display = 'inline-flex'; };
+        const removeLogo = async () => {
+            companyLogo = null;
+            await db.collection("branches").doc(currentBranch).collection("settings").doc("meta").set({ logo: null }, { merge: true });
+            document.getElementById('logo-preview-wrap').style.display = 'none'; document.getElementById('remove-logo-btn').style.display = 'none';
+            showToast("Logo removed.", "delete");
+        };
+
+        window.triggerOfferPhoto = (plu) => { _pendingPhotoOfferId = plu; document.getElementById('offer-photo-file-input').click(); };
+        window.handleOfferPhotoUpload = async (e) => {
+            const file = e.target.files[0]; if(!file || !_pendingPhotoOfferId) return;
+            showToast("Uploading photo...", "cloud_upload");
+            const plu = _pendingPhotoOfferId;
+            const photoRef = storage.ref().child(`branches/${currentBranch}/offers/${plu}_${Date.now()}`);
+            try {
+                await photoRef.put(file);
+                const downloadUrl = await photoRef.getDownloadURL();
+                if(!offerData[plu]) offerData[plu] = {};
+                offerData[plu].photo = downloadUrl;
+                await saveOfferData(); renderOfferTable();
+                showToast("Photo updated.", "check_circle");
+            } catch (error) { console.error(error); showToast("Photo upload failed.", "error"); }
+            _pendingPhotoOfferId = null; e.target.value = '';
+        };
+
+        // =====================================================================
+        // 6. UI ACTIONS & TABLES
+        // =====================================================================
+        window.addSingleItem = async () => {
+            const plu = document.getElementById('single-plu').value.trim(); const rawName = document.getElementById('single-name').value.trim(); const price = parseFloat(document.getElementById('single-price').value);
+            if(!plu || !rawName || isNaN(price)) { showToast("Please fill all fields.", "error"); return; }
+            let baseUnit = 'KG'; const upName = rawName.toUpperCase();
+            if(upName.includes('BOX')) baseUnit = 'BOX'; if(upName.includes('PIECE') || upName.includes(' PC')) baseUnit = 'PC';
+            appData[plu] = { plu, rawName, displayName: cleanItemName(rawName), masterPrice: price, currentPrice: price, conversion: 1, unitText: baseUnit };
+            await db.collection("branches").doc(currentBranch).collection("items").doc(plu).set(appData[plu]);
+            updateMasterStatus(); renderTable();
+            document.getElementById('single-plu').value = ''; document.getElementById('single-name').value = ''; document.getElementById('single-price').value = '';
+            showToast(`Item ${plu} added.`, "check_circle");
+        };
+
+        window.updateName = async (plu, newName) => { if(appData[plu]) { appData[plu].displayName = newName.trim() || appData[plu].rawName; await db.collection("branches").doc(currentBranch).collection("items").doc(plu).set(appData[plu]); } };
+        window.updateConversion = async (plu, val) => {
+            if(appData[plu]) {
+                const numVal = parseFloat(val) || 1; appData[plu].conversion = numVal;
+                if(numVal > 0 && numVal < 1) { appData[plu].unitText = `${Math.round(numVal * 1000)}G`; } 
+                else { let baseUnit = 'KG'; const upName = appData[plu].rawName.toUpperCase(); if(upName.includes('BOX')) baseUnit = 'BOX'; if(upName.includes('PIECE') || upName.includes(' PC')) baseUnit = 'PC'; appData[plu].unitText = baseUnit; }
+                const calcPrice = appData[plu].currentPrice * appData[plu].conversion;
+                document.getElementById(`res-${plu}`).innerText = `${formatPrice(calcPrice)}/${appData[plu].unitText}`;
+                await db.collection("branches").doc(currentBranch).collection("items").doc(plu).set(appData[plu]);
+            }
+        };
+        window.toggleActive = async (plu, isActive) => { if(appData[plu]) { appData[plu].inactive = !isActive; await db.collection("branches").doc(currentBranch).collection("items").doc(plu).set(appData[plu]); renderTable(); } };
+        window.toggleOfferActive = async (plu, isActive) => { if(!offerData[plu]) offerData[plu] = {}; offerData[plu].offerActive = isActive; await db.collection("branches").doc(currentBranch).collection("offers").doc(plu).set(offerData[plu]); renderOfferTable(); };
+
+        const renderTable = () => {
+            const items = Object.values(appData); const tbody = document.getElementById('items-tbody'); const emptyState = document.getElementById('empty-state');
+            if(items.length === 0) { tbody.innerHTML = ''; emptyState.style.display = 'block'; return; }
+            emptyState.style.display = 'none'; tbody.innerHTML = '';
+            items.sort((a,b) => a.displayName.localeCompare(b.displayName)).forEach(item => {
+                const tr = document.createElement('tr'); const calcPrice = item.currentPrice * item.conversion;
+                if(item.inactive) tr.style.opacity = '0.4';
+                tr.innerHTML = `
+                    <td style="color:var(--md-sys-color-on-surface-variant);">${item.plu}</td>
+                    <td><div class="editable-cell" contenteditable="true" onblur="updateName('${item.plu}', this.innerText)">${item.displayName}</div></td>
+                    <td>${formatPrice(item.currentPrice)}</td>
+                    <td><input type="number" class="md-input-small" step="0.05" min="0.05" value="${item.conversion}" oninput="updateConversion('${item.plu}', this.value)"></td>
+                    <td style="font-weight: 500;" id="res-${item.plu}">${formatPrice(calcPrice)}/${item.unitText}</td>
+                    <td style="text-align:center;"><label class="toggle-switch"><input type="checkbox" ${item.inactive ? '' : 'checked'} onchange="toggleActive('${item.plu}', this.checked)"><span class="toggle-slider"></span></label></td>
                 `;
+                tbody.appendChild(tr);
+            });
+        };
+
+        const renderOfferTable = () => {
+            const items = Object.values(appData); const tbody = document.getElementById('offer-tbody'); const emptyState = document.getElementById('offer-empty-state');
+            if(items.length === 0) { tbody.innerHTML = ''; emptyState.style.display = 'block'; return; }
+            emptyState.style.display = 'none'; tbody.innerHTML = '';
+            items.sort((a,b) => a.displayName.localeCompare(b.displayName)).forEach(item => {
+                const meta = offerData[item.plu] || {}; const isOfferActive = !!meta.offerActive; const calcPrice = item.currentPrice * item.conversion;
+                const tr = document.createElement('tr'); if(!isOfferActive) tr.style.opacity = '0.45';
+                const photoCell = meta.photo ? `<img src="${meta.photo}" class="offer-photo-thumb" onclick="triggerOfferPhoto('${item.plu}')" style="cursor:pointer;" title="Change">` : `<div class="offer-photo-placeholder" onclick="triggerOfferPhoto('${item.plu}')"><span class="material-symbols-outlined">add_photo_alternate</span></div>`;
+                tr.innerHTML = `<td>${photoCell}</td><td style="color:var(--md-sys-color-on-surface-variant);">${item.plu}</td><td>${item.displayName}</td><td>${formatPrice(calcPrice)}/${item.unitText}</td>
+                    <td style="text-align:center;"><label class="toggle-switch"><input type="checkbox" ${isOfferActive ? 'checked' : ''} onchange="toggleOfferActive('${item.plu}', this.checked)"><span class="toggle-slider"></span></label></td>`;
+                tbody.appendChild(tr);
+            });
+        };
+
+        // =====================================================================
+        // 7. PRINTING LOGIC
+        // =====================================================================
+        const openGenerateDialog = () => {
+            if(Object.keys(appData).length===0) { showToast("No items available.", "warning"); return; }
+            const body = document.getElementById('dialog-list-body'); body.innerHTML = '';
+            Object.values(appData).filter(i => !i.inactive).sort((a,b) => a.displayName.localeCompare(b.displayName)).forEach(item => {
+                const finalLabel = `${formatPrice(item.currentPrice * item.conversion)}/${item.unitText}`;
+                const div = document.createElement('label'); div.className = 'list-item';
+                div.innerHTML = `<input type="checkbox" class="item-checkbox" value="${item.plu}" checked><div class="list-item-text"><div class="list-item-title">${item.displayName}</div><div class="list-item-subtitle">Base: ${formatPrice(item.currentPrice)} &bull; Output: <strong>${finalLabel}</strong></div></div>`;
                 body.appendChild(div);
             });
-            document.getElementById('check-all').checked = true;
-            document.getElementById('generate-dialog').classList.remove('hidden');
+            document.getElementById('check-all').checked = true; document.getElementById('generate-dialog').classList.remove('hidden');
         };
-
-        const closeGenerateDialog = () => {
-            document.getElementById('generate-dialog').classList.add('hidden');
-            document.getElementById('dialog-search').value = '';
-        };
-
-        const filterDialogItems = (query) => {
-            const q = query.toLowerCase();
-            document.querySelectorAll('#dialog-list-body .list-item').forEach(el => {
-                el.style.display = el.querySelector('.list-item-title').innerText.toLowerCase().includes(q) ? '' : 'none';
-            });
-        };
-
-        const toggleSelectAll = () => {
-            const checked = document.getElementById('check-all').checked;
-            document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = checked);
-        };
+        const closeGenerateDialog = () => { document.getElementById('generate-dialog').classList.add('hidden'); document.getElementById('dialog-search').value = ''; };
+        const filterDialogItems = (q) => { document.querySelectorAll('#dialog-list-body .list-item').forEach(el => el.style.display = el.querySelector('.list-item-title').innerText.toLowerCase().includes(q.toLowerCase()) ? '' : 'none'); };
+        const toggleSelectAll = () => { const checked = document.getElementById('check-all').checked; document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = checked); };
 
         const generateAndPrintPDF = () => {
             const selectedPLUs = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => cb.value);
-            if(selectedPLUs.length === 0) { showToast("Please select at least one item.", "warning"); return; }
+            if(selectedPLUs.length===0) return showToast("Select at least one item.", "warning");
             const printArea = document.getElementById('print-area'); printArea.innerHTML = '';
-            for(let i = 0; i < selectedPLUs.length; i += 8) {
-                const chunk = selectedPLUs.slice(i, i + 8);
-                const pageWrap = document.createElement('div'); pageWrap.className = 'print-page';
+            for(let i=0; i<selectedPLUs.length; i+=8) {
+                const chunk = selectedPLUs.slice(i, i+8); const pageWrap = document.createElement('div'); pageWrap.className = 'print-page';
                 chunk.forEach(plu => {
-                    const item = appData[plu];
-                    const calcPrice = item.currentPrice * item.conversion;
-                    const formattedPriceHTML = formatPriceHTML(calcPrice);
-                    const labelDiv = document.createElement('div'); labelDiv.className = 'talker-label';
-                    const nameWidth = '65%'; const maxPx = 566;
+                    const item = appData[plu]; const labelDiv = document.createElement('div'); labelDiv.className = 'talker-label';
                     const fitName = (() => {
-                        const words = item.displayName.toUpperCase().split(' ');
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        ctx.font = '900 88px Calibri, sans-serif';
-                        let result = '';
-                        for(const word of words) {
-                            const test = result ? result + ' ' + word : word;
-                            if(ctx.measureText(test).width > maxPx) break;
-                            result = test;
-                        }
-                        return result || words[0].substring(0, 6);
+                        const words = item.displayName.toUpperCase().split(' '); const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); ctx.font = '900 88px Calibri, sans-serif';
+                        let result = ''; for(const w of words) { const test = result ? result+' '+w : w; if(ctx.measureText(test).width>566) break; result = test; } return result || words[0].substring(0, 6);
                     })();
-                    const unitIsGrams = /^\d+G$/.test(item.unitText);
-                    const unitStyle = unitIsGrams ? ' style="font-size:25px !important;"' : '';
-                    labelDiv.innerHTML = `
-                        <div class="talker-name" style="width:${nameWidth} !important">${fitName}</div>
-                        <div class="talker-price-container">
-                            <span class="talker-price">${formattedPriceHTML}</span><span class="talker-unit"${unitStyle}>/${item.unitText}</span>
-                        </div>
-                        <div class="talker-plu">${item.plu}</div>
-                    `;
+                    labelDiv.innerHTML = `<div class="talker-name" style="width:65% !important">${fitName}</div><div class="talker-price-container"><span class="talker-price">${formatPriceHTML(item.currentPrice * item.conversion)}</span><span class="talker-unit"${/^\d+G$/.test(item.unitText)?' style="font-size:25px !important;"':''}>/${item.unitText}</span></div><div class="talker-plu">${item.plu}</div>`;
                     pageWrap.appendChild(labelDiv);
                 });
-                if(chunk.length < 8) {
-                    for(let j = 0; j < (8 - chunk.length); j++) {
-                        const emptyBlock = document.createElement('div'); emptyBlock.className = 'talker-label';
-                        emptyBlock.style.borderBottom = "none"; pageWrap.appendChild(emptyBlock);
-                    }
-                }
+                for(let j=chunk.length; j<8; j++) { const empty = document.createElement('div'); empty.className = 'talker-label'; empty.style.borderBottom = "none"; pageWrap.appendChild(empty); }
                 printArea.appendChild(pageWrap);
             }
-            closeGenerateDialog();
-            document.getElementById('page-orient').textContent = '@media print { @page { size: A4 portrait; margin: 0; } }';
-            setTimeout(() => { window.print(); }, 300);
+            closeGenerateDialog(); document.getElementById('page-orient').textContent = '@media print { @page { size: A4 portrait; margin: 0; } }'; setTimeout(() => window.print(), 300);
         };
 
-        // ===================== OFFER PRINT DIALOG =====================
         const openOfferPrintDialog = () => {
-            const activeItems = Object.values(appData).filter(item => {
-                const meta = offerData[item.plu];
-                return meta && meta.offerActive;
-            });
-            if(activeItems.length === 0) { showToast("No active offer items. Go to Settings → Offer Items and toggle items on.", "warning"); return; }
+            const activeItems = Object.values(appData).filter(item => offerData[item.plu] && offerData[item.plu].offerActive);
+            if(activeItems.length===0) return showToast("No active offer items. Mark items in Settings first.", "warning");
             const body = document.getElementById('offer-dialog-body'); body.innerHTML = '';
             activeItems.sort((a,b) => a.displayName.localeCompare(b.displayName)).forEach(item => {
-                const meta = offerData[item.plu] || {};
-                const calcPrice = (item.currentPrice * item.conversion).toFixed(2);
-                const card = document.createElement('div'); card.className = 'offer-print-card'; card.dataset.plu = item.plu;
-                card.innerHTML = `
-                    ${meta.photo ? `<img src="${meta.photo}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : `<div style="width:56px;height:56px;border-radius:6px;background:var(--md-sys-color-surface-container);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-outlined" style="font-size:20px;color:var(--md-sys-color-on-surface-variant);">image</span></div>`}
+                const meta = offerData[item.plu] || {}; const card = document.createElement('div'); card.className = 'offer-print-card'; card.dataset.plu = item.plu;
+                card.innerHTML = `${meta.photo ? `<img src="${meta.photo}">` : `<div class="no-img"><span class="material-symbols-outlined">image</span></div>`}
                     <div style="flex-grow:1; display:flex; flex-direction:column; gap:6px;">
-                        <input class="offer-edit-name" type="text" value="${item.displayName}" placeholder="Item name">
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <label style="font-size:12px;color:var(--md-sys-color-on-surface-variant);">Price ₹</label>
-                            <input class="offer-edit-price" type="number" value="${calcPrice}">
-                        </div>
-                    </div>
-                    <input type="checkbox" class="offer-print-check" checked style="width:20px;height:20px;flex-shrink:0;">
-                `;
+                        <input class="offer-edit-name" type="text" value="${item.displayName}">
+                        <div style="display:flex; gap:8px; align-items:center;"><label style="font-size:12px;color:var(--md-sys-color-on-surface-variant);">Price ₹</label><input class="offer-edit-price" type="number" value="${(item.currentPrice*item.conversion).toFixed(2)}"></div>
+                    </div><input type="checkbox" class="offer-print-check" checked style="width:20px;height:20px;flex-shrink:0;">`;
                 body.appendChild(card);
             });
-            document.getElementById('offer-dialog-search').value = '';
-            document.getElementById('offer-print-dialog').classList.remove('hidden');
+            document.getElementById('offer-dialog-search').value = ''; document.getElementById('offer-print-dialog').classList.remove('hidden');
         };
-
-        const closeOfferPrintDialog = () => { document.getElementById('offer-print-dialog').classList.add('hidden'); };
-
-        const filterOfferDialogItems = (query) => {
-            const q = query.toLowerCase();
-            document.querySelectorAll('#offer-dialog-body .offer-print-card').forEach(el => {
-                const name = el.querySelector('.offer-edit-name').value.toLowerCase();
-                el.style.display = name.includes(q) ? '' : 'none';
-            });
-        };
+        const closeOfferPrintDialog = () => document.getElementById('offer-print-dialog').classList.add('hidden');
+        const filterOfferDialogItems = (q) => document.querySelectorAll('#offer-dialog-body .offer-print-card').forEach(el => el.style.display = el.querySelector('.offer-edit-name').value.toLowerCase().includes(q.toLowerCase()) ? '' : 'none');
 
         const generateOfferPDF = () => {
-            const cards = Array.from(document.querySelectorAll('#offer-dialog-body .offer-print-card'));
-            const selected = cards.filter(c => c.querySelector('.offer-print-check').checked);
-            if(selected.length === 0) { showToast("Please select at least one offer item.", "warning"); return; }
-
-            const items = selected.map(card => {
-                const plu = card.dataset.plu;
-                const meta = offerData[plu] || {};
-                return {
-                    name: card.querySelector('.offer-edit-name').value.trim(),
-                    offerPrice: parseFloat(card.querySelector('.offer-edit-price').value),
-                    photo: meta.photo || null
-                };
-            });
-
+            const selected = Array.from(document.querySelectorAll('#offer-dialog-body .offer-print-card')).filter(c => c.querySelector('.offer-print-check').checked);
+            if(selected.length===0) return showToast("Select at least one offer item.", "warning");
             const printArea = document.getElementById('print-area'); printArea.innerHTML = '';
-
-            for(let i = 0; i < items.length; i += 4) {
-                const chunk = items.slice(i, i + 4);
-
-                const pageWrap = document.createElement('div');
+            
+            const items = selected.map(card => ({ name: card.querySelector('.offer-edit-name').value.trim(), offerPrice: parseFloat(card.querySelector('.offer-edit-price').value), photo: (offerData[card.dataset.plu] || {}).photo || null }));
+            
+            for(let i=0; i<items.length; i+=4) {
+                const chunk = items.slice(i, i+4); const pageWrap = document.createElement('div');
                 pageWrap.style.cssText = 'display:flex; flex-direction:row; flex-wrap:wrap; width:297mm; height:210mm; box-sizing:border-box; padding:5mm; gap:4mm; background:white; page-break-after:always;';
-
+                
                 chunk.forEach(item => {
-                    const price = parseFloat(item.offerPrice);
-                    const [whole, dec] = price.toFixed(2).split('.');
-                    const showDec = dec && dec !== '00';
-
-                    const card = document.createElement('div');
-                    card.style.cssText = [
-                        'width:calc(50% - 2mm)', 'height:calc(50% - 2mm)',
-                        'box-sizing:border-box', 'display:flex', 'flex-direction:column',
-                        'background:#FFD700', 'border-radius:5mm', 'overflow:hidden',
-                        'padding:3mm 3mm 0 3mm',
-                        '-webkit-print-color-adjust:exact', 'print-color-adjust:exact', 'color-adjust:exact'
-                    ].join(';');
-
-                    // UPDATED: Name size is now 35pt, centered in a full-width container
+                    const [whole, dec] = item.offerPrice.toFixed(2).split('.'); const showDec = dec && dec !== '00';
+                    const card = document.createElement('div'); card.style.cssText = 'width:calc(50% - 2mm);height:calc(50% - 2mm);box-sizing:border-box;display:flex;flex-direction:column;background:#FFD700;border-radius:5mm;overflow:hidden;padding:3mm 3mm 0 3mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;';
                     card.innerHTML = `
                         <div style="flex-shrink:0; padding:0 1mm 2mm 1mm; display:flex; align-items:baseline; gap: 4px;">
                             <span style="color:#d32f2f;font-weight:700;font-size:10pt;font-family:Arial,sans-serif;text-transform:uppercase;line-height:1.3;">EVERY DAY</span>
                             <span style="color:#d32f2f;font-weight:900;font-size:17pt;font-family:Arial,sans-serif;text-transform:uppercase;line-height:1.1;">LOW PRICE</span>
                         </div>
                         <div style="flex-grow:1;background:white;border-radius:4mm 4mm 2mm 2mm;display:flex;flex-direction:column;padding:3mm 4mm 3mm 4mm;box-sizing:border-box;overflow:hidden;">
-                            
-                            <!-- CENTERED NAME CONTAINER -->
                             <div style="width:100%; display:flex; justify-content:center; margin-bottom:2mm; overflow:hidden; white-space:nowrap;">
-                                <span style="font-size:35pt; font-weight:900; font-family:Arial,sans-serif; color:#111; text-transform:uppercase; line-height:1.1;">
-                                    ${item.name.toUpperCase()}
-                                </span>
+                                <span style="font-size:35pt; font-weight:900; font-family:Arial,sans-serif; color:#111; text-transform:uppercase; line-height:1.1;">${item.name.toUpperCase()}</span>
                             </div>
-
                             <div style="display:flex;flex-direction:row;align-items:flex-end;flex-grow:1;">
-                                ${item.photo
-                                    ? `<img src="${item.photo}" style="width:45mm;height:45mm;object-fit:cover;border-radius:2mm;flex-shrink:0;display:block;align-self:flex-end;">`
-                                    : `<div style="width:45mm;height:45mm;flex-shrink:0;background:#f0f0f0;border-radius:2mm;align-self:flex-end;"></div>`
-                                }
+                                ${item.photo ? `<img src="${item.photo}" style="width:45mm;height:45mm;object-fit:cover;border-radius:2mm;flex-shrink:0;display:block;align-self:flex-end;">` : `<div style="width:45mm;height:45mm;flex-shrink:0;background:#f0f0f0;border-radius:2mm;align-self:flex-end;"></div>`}
                                 <div style="flex-grow:1;display:flex;flex-direction:column;align-items:flex-end;justify-content:flex-end;gap:1.5mm;padding-bottom:1mm;">
                                     <div style="display:flex;align-items:flex-start;line-height:0.9;">
                                         <span style="color:#d32f2f;font-size:76pt;font-weight:900;font-family:Arial,sans-serif;line-height:0.9;white-space:nowrap;letter-spacing:-1px;">₹${whole}</span>${showDec ? `<span style="color:#d32f2f;font-size:28pt;font-weight:700;font-family:Arial,sans-serif;line-height:0.9;margin-top:10pt;">.${dec}</span>` : ''}
@@ -1138,39 +770,47 @@
                     `;
                     pageWrap.appendChild(card);
                 });
-
-                for(let j = chunk.length; j < 4; j++) {
-                    const empty = document.createElement('div');
-                    empty.style.cssText = 'width:calc(50% - 2mm);height:calc(50% - 2mm);box-sizing:border-box;';
-                    pageWrap.appendChild(empty);
-                }
+                for(let j=chunk.length; j<4; j++) { const empty = document.createElement('div'); empty.style.cssText = 'width:calc(50% - 2mm);height:calc(50% - 2mm);box-sizing:border-box;'; pageWrap.appendChild(empty); }
                 printArea.appendChild(pageWrap);
             }
-
-            // Swap to landscape before print, restore after
-            document.getElementById('page-orient').textContent = '@media print { @page { size: A4 landscape; margin: 0; } }';
-            closeOfferPrintDialog();
-            setTimeout(() => {
-                window.print();
-                setTimeout(() => {
-                    document.getElementById('page-orient').textContent = '@media print { @page { size: A4 portrait; margin: 0; } }';
-                }, 1000);
-            }, 300);
+            document.getElementById('page-orient').textContent = '@media print { @page { size: A4 landscape; margin: 0; } }'; closeOfferPrintDialog();
+            setTimeout(() => { window.print(); setTimeout(() => document.getElementById('page-orient').textContent = '@media print { @page { size: A4 portrait; margin: 0; } }', 1000); }, 300);
         };
 
-        // ===================== DELETE DIALOG =====================
-        const openDeleteDialog = () => { document.getElementById('delete-dialog').classList.remove('hidden'); };
-        const closeDeleteDialog = () => { document.getElementById('delete-dialog').classList.add('hidden'); };
-        const confirmClearData = () => {
+        // =====================================================================
+        // 8. DATA WIPING
+        // =====================================================================
+        const openDeleteDialog = () => { document.getElementById('delete-branch-name').innerText = currentBranch.toUpperCase(); document.getElementById('delete-dialog').classList.remove('hidden'); };
+        const closeDeleteDialog = () => document.getElementById('delete-dialog').classList.add('hidden');
+        const confirmClearData = async () => {
+            showToast("Deleting branch data...", "delete");
+            closeDeleteDialog();
+            
+            // Delete Settings
+            await db.collection("branches").doc(currentBranch).collection("settings").doc("meta").delete().catch(e=>console.log(e));
+            
+            // Note: Batch deleting large collections from the client is restricted by limits. 
+            // For a robust app, you would use a Cloud Function. Here, we wipe local state and upload empties.
             appData = {}; offerData = {}; companyLogo = null;
-            saveData(); saveOfferData();
-            localStorage.removeItem('talker_last_updated');
-            localStorage.removeItem('talker_logo');
+            
+            // Fetch and delete all items
+            const itemsSnap = await db.collection("branches").doc(currentBranch).collection("items").get();
+            const offersSnap = await db.collection("branches").doc(currentBranch).collection("offers").get();
+            
+            const wipeChunks = async (snap, coll) => {
+                const docs = snap.docs;
+                for(let i=0; i<docs.length; i+=450) {
+                    const chunk = docs.slice(i, i+450); const batch = db.batch();
+                    chunk.forEach(doc => batch.delete(doc.ref)); await batch.commit();
+                }
+            };
+            
+            await wipeChunks(itemsSnap, "items"); await wipeChunks(offersSnap, "offers");
+
             document.getElementById('daily-status-home').innerText = 'No recent updates';
-            document.getElementById('logo-preview-wrap').style.display = 'none';
-            document.getElementById('remove-logo-btn').style.display = 'none';
-            updateMasterStatus(); renderTable(); renderOfferTable(); closeDeleteDialog();
-            showToast("All data cleared successfully.", "delete");
+            document.getElementById('logo-preview-wrap').style.display = 'none'; document.getElementById('remove-logo-btn').style.display = 'none';
+            updateMasterStatus(); renderTable(); renderOfferTable();
+            showToast(`All data cleared for ${currentBranch.toUpperCase()}.`, "delete");
         };
     </script>
 </body>
