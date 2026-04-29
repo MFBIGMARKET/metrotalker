@@ -381,6 +381,35 @@
         </div>
     </div>
 
+    <!-- Daily Summary Dialog -->
+    <div class="dialog-scrim hidden" id="daily-summary-dialog">
+        <div class="dialog-container" style="max-width: 380px;">
+            <div class="dialog-header" style="text-align: center; padding-top: 32px;">
+                <span class="material-symbols-outlined" style="font-size: 56px; color: var(--md-sys-color-primary); margin-bottom: 12px; font-variation-settings: 'FILL' 1;">task_alt</span>
+                <h2 style="font-size: 22px;">Update Complete</h2>
+            </div>
+            <div class="dialog-content" style="padding: 0 24px 24px;">
+                <div style="background: var(--md-sys-color-surface-container); border-radius: var(--radius-md); padding: 16px; margin-top: 8px;">
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--md-sys-color-surface-container-high);">
+                        <span style="color: var(--md-sys-color-on-surface-variant); display: flex; align-items: center; gap: 8px;"><span class="material-symbols-outlined" style="font-size: 18px;">add_circle</span> New Items</span>
+                        <strong style="color: #188038; font-size: 16px;" id="summary-added">0</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--md-sys-color-surface-container-high);">
+                        <span style="color: var(--md-sys-color-on-surface-variant); display: flex; align-items: center; gap: 8px;"><span class="material-symbols-outlined" style="font-size: 18px;">price_change</span> Price Changed</span>
+                        <strong style="color: var(--md-sys-color-primary); font-size: 16px;" id="summary-changed">0</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                        <span style="color: var(--md-sys-color-on-surface-variant); display: flex; align-items: center; gap: 8px;"><span class="material-symbols-outlined" style="font-size: 18px;">rule</span> Unchanged</span>
+                        <strong style="color: var(--md-sys-color-on-surface); font-size: 16px;" id="summary-unchanged">0</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="dialog-actions" style="justify-content: center; padding-bottom: 24px;">
+                <button class="btn-filled" style="width: 100%; max-width: 200px;" onclick="document.getElementById('daily-summary-dialog').classList.add('hidden')">Done</button>
+            </div>
+        </div>
+    </div>
+
     <div id="snackbar"><span class="material-symbols-outlined" id="snackbar-icon" style="font-size: 20px;">info</span><span id="snackbar-text">Message</span></div>
     <div id="print-area"></div>
     <input type="file" id="offer-photo-file-input" accept="image/*" class="hidden" onchange="handleOfferPhotoUpload(event)">
@@ -543,7 +572,7 @@
 
         window.handleDailyUpload = (e) => {
             const file = e.target.files[0]; if(!file) return;
-            if(Object.keys(appData).length === 0) { showToast("Upload Master PLU file first!", "error"); e.target.value = ''; return; }
+            
             showToast("Processing XLSX...", "sync");
             const reader = new FileReader();
             reader.onload = async function(ev) {
@@ -552,26 +581,73 @@
                     const ws = wb.Sheets[wb.SheetNames[0]];
                     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
                     let headerIndex = -1;
-                    for(let i = 0; i < rows.length; i++) { if(rows[i][0] && rows[i][0].toString().trim() === 'PLU No') { headerIndex = i; break; } }
+                    
+                    for(let i = 0; i < rows.length; i++) { 
+                        if(rows[i][0] && rows[i][0].toString().trim() === 'PLU No') { headerIndex = i; break; } 
+                    }
                     if(headerIndex === -1) { showToast("Could not find 'PLU No' header.", "error"); e.target.value = ''; return; }
-                    let changedCount = 0, checkedCount = 0;
+                    
+                    let changedCount = 0, checkedCount = 0, addedCount = 0;
+                    
                     for(let i = headerIndex + 1; i < rows.length; i++) {
-                        const row = rows[i]; const plu = row[0] ? row[0].toString().trim() : null;
+                        const row = rows[i]; 
+                        const plu = row[0] ? row[0].toString().trim() : null;
                         const price = row[3] ? parseFloat(row[3].toString().replace(/,/g, '')) : NaN;
-                        if(plu && !isNaN(price) && appData[plu]) {
-                            checkedCount++;
-                            if(appData[plu].currentPrice !== price) { appData[plu].currentPrice = price; changedCount++; }
+                        
+                        if(plu && !isNaN(price)) {
+                            if(appData[plu]) {
+                                checkedCount++;
+                                if(appData[plu].currentPrice !== price) { 
+                                    appData[plu].currentPrice = price; 
+                                    changedCount++; 
+                                }
+                            } else {
+                                // AUTO-ADD NEW PLU TO DATABASE
+                                // Tries to get name from column 1 or 2, defaults to "Item {PLU}"
+                                const rawName = (row[1] || row[2] || `Item ${plu}`).toString().trim();
+                                let baseUnit = 'KG'; 
+                                const upName = rawName.toUpperCase();
+                                if(upName.includes('BOX')) baseUnit = 'BOX'; 
+                                if(upName.includes('PIECE') || upName.includes(' PC')) baseUnit = 'PC';
+                                
+                                appData[plu] = { 
+                                    plu: plu, 
+                                    rawName: rawName, 
+                                    displayName: cleanItemName(rawName), 
+                                    masterPrice: price, 
+                                    currentPrice: price, 
+                                    conversion: 1, 
+                                    unitText: baseUnit 
+                                };
+                                addedCount++;
+                            }
                         }
                     }
-                    showToast("Syncing Daily Prices...", "cloud_upload");
-                    await saveData(); renderTable();
+                    
+                    showToast("Syncing Database...", "cloud_upload");
+                    await saveData(); 
+                    renderTable();
+                    updateMasterStatus();
+                    
                     const dateString = new Date().toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
                     await db.collection("branches").doc(currentBranch).collection("settings").doc("meta").set({ lastUpdated: dateString }, { merge: true });
                     document.getElementById('daily-status-home').innerText = `Updated: ${dateString}`;
                     e.target.value = '';
-                    if(changedCount > 0) showToast(`Daily: ${changedCount} items changed prices.`, "price_check");
-                    else showToast(`Checked ${checkedCount} items. No changes.`, "done_all");
-                } catch(err) { showToast("Failed to read XLSX file.", "error"); e.target.value = ''; }
+                    
+                    // Show Modern Summary Popup
+                    document.getElementById('summary-added').innerText = addedCount;
+                    document.getElementById('summary-changed').innerText = changedCount;
+                    document.getElementById('summary-unchanged').innerText = checkedCount;
+                    
+                    // Hide toast and display modal
+                    document.getElementById("snackbar").className = document.getElementById("snackbar").className.replace("show", "");
+                    document.getElementById('daily-summary-dialog').classList.remove('hidden');
+
+                } catch(err) { 
+                    console.error(err); 
+                    showToast("Failed to read XLSX file.", "error"); 
+                    e.target.value = ''; 
+                }
             };
             reader.readAsArrayBuffer(file);
         };
